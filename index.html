@@ -1765,8 +1765,33 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     head.add(new THREE.Mesh(new THREE.BoxGeometry(.3,.3,.3),sk));
     sp=new THREE.Mesh(new THREE.BoxGeometry(.22,.07,.04),vz);sp.position.set(0,.03,.16);head.add(sp);
     g.add(head);
+    var mount=new THREE.Group();mount.position.set(.38,.9,.18);g.add(mount);
     sp=labelSprite(name);sp.position.set(0,2.2,0);g.add(sp);
-    return {g:g,head:head};
+    return {g:g,head:head,mount:mount,held:null,heldName:null};
+  }
+  function makeHeld(name){
+    var g=new THREE.Group(),wd=new THREE.MeshLambertMaterial({color:0x5a4128,flatShading:true}),st=new THREE.MeshLambertMaterial({color:0x6f7278,flatShading:true}),dk=new THREE.MeshLambertMaterial({color:0x2b2d30,flatShading:true}),bl=new THREE.MeshLambertMaterial({color:0x3a3a3a,flatShading:true}),m,tg;
+    function bx(w,h,d,mat,x,y,z,rx){var b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);b.position.set(x,y,z);if(rx)b.rotation.x=rx;g.add(b);return b;}
+    if(name==='Булыжник'){
+      m=new THREE.Mesh(new THREE.DodecahedronGeometry(1,0),stoneMat(0xd0d0d4));m.scale.setScalar(.13);m.position.set(0,.05,.15);g.add(m);
+    }else if(name==='Каменный топор'||name==='Каменная кирка'){
+      m=new THREE.Mesh(new THREE.CylinderGeometry(.025,.03,.8,6),wd);m.position.y=.25;g.add(m);
+      if(name==='Каменный топор')bx(.04,.1,.24,st,0,.62,.08);else bx(.04,.05,.5,st,0,.62,0);
+      g.rotation.x=.6;
+    }else if(name==='Копьё'){
+      m=new THREE.Mesh(new THREE.CylinderGeometry(.02,.025,1.7,6),wd);m.rotation.x=Math.PI/2;m.position.z=.2;g.add(m);
+      m=new THREE.Mesh(new THREE.ConeGeometry(.04,.2,6),st);m.rotation.x=Math.PI/2;m.position.z=1.15;g.add(m);
+    }else if(name==='Лук'){
+      tg=new THREE.TorusGeometry(.4,.02,6,20,Math.PI);tg.rotateZ(-Math.PI/2);tg.rotateY(-Math.PI/2);
+      g.add(new THREE.Mesh(tg,wd));bx(.012,.8,.012,bl,0,0,0);g.position.set(0,.1,.1);
+    }else if(name==='Калаш'){
+      bx(.07,.09,.55,dk,0,0,.2);
+      m=new THREE.Mesh(new THREE.CylinderGeometry(.015,.015,.4,6),dk);m.rotation.x=Math.PI/2;m.position.set(0,.02,.65);g.add(m);
+      bx(.08,.07,.28,wd,0,-.01,.5);bx(.05,.2,.08,bl,0,-.14,.28,-.25);bx(.05,.1,.06,wd,0,-.09,0,.3);bx(.06,.1,.25,wd,0,-.01,-.15);
+    }else if(name==='Сачель'){
+      m=makeSatchelMesh();m.position.set(0,0,.15);g.add(m);
+    }else return null;
+    return g;
   }
   function updRemotes(dt){
     var id,r,now=performance.now(),k=Math.min(1,dt*12),st,da;
@@ -1781,6 +1806,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       r.av.g.position.z+=(st.z-r.av.g.position.z)*k;
       da=st.yaw+Math.PI-r.av.g.rotation.y;da=Math.atan2(Math.sin(da),Math.cos(da));r.av.g.rotation.y+=da*k;
       r.av.head.rotation.x=-st.pitch;
+      if(r.av.heldName!==st.it){
+        if(r.av.held){r.av.mount.remove(r.av.held);r.av.held=null;}
+        r.av.heldName=st.it;r.av.held=makeHeld(st.it);
+        if(r.av.held)r.av.mount.add(r.av.held);
+      }
     }
   }
   var lastHud='';
