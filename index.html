@@ -621,7 +621,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(crit||!tree.cross)placeCross(tree);
     if(tree.wood<=0){
       scene.remove(tree.g);if(tree.die)tree.die();if(tree.cross)scene.remove(tree.cross);
-      trees.splice(trees.indexOf(tree),1);say((isIron?'Руда добыта':isRock?'Камень выбит':'Дерево срублено')+'! +'+amt);
+      trees.splice(trees.indexOf(tree),1);tree.dead=true;netEvent({t:'dead',id:tree.id});say((isIron?'Руда добыта':isRock?'Камень выбит':'Дерево срублено')+'! +'+amt);
     }else say((crit?'Точный удар! ':'')+'+'+amt+(isIron?' руды':isRock?' камня':' дерева'));
     updHud();
   }
@@ -918,26 +918,33 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }
     ghost.visible=true;curOK=validPlace(curInfo,curParts);gmat.color.setHex(curOK?0x6fbf5f:0xc0503f);
   }
-  function placePiece(){
-    if(!curOK||!curInfo){say('Сюда нельзя поставить');return;}
-    var inf=curInfo,g=new THREE.Group(),isC=inf.k==='F'||inf.k==='R';
+  function buildPiece(inf){
+    var parts=partsOf(inf),g=new THREE.Group(),isC=inf.k==='F'||inf.k==='R';
     var rec={c:isC?'C':'E',k:inf.k,t:inf.t,i:inf.i,j:inf.j,l:inf.l,top:inf.top,base:inf.base,g:g,cols:[],meshes:[],key:inf.key,fd:null,hp:({F:20,W:10,D:10,R:10})[inf.k]};
-    curParts.forEach(function(p){
+    parts.forEach(function(p){
       var m=pmat[p.col]||(pmat[p.col]=woodMat(p.col)),b=new THREE.Mesh(new THREE.BoxGeometry(p.sx,p.sy,p.sz),m);
       b.position.set(p.x,p.y,p.z);b.userData.rec=rec;g.add(b);pick.push(b);rec.meshes.push(b);
       if(p.solid){var cb={x0:p.x-p.sx/2,x1:p.x+p.sx/2,z0:p.z-p.sz/2,z1:p.z+p.sz/2,y0:p.y-p.sy/2,y1:p.y+p.sy/2};colliders.push(cb);rec.cols.push(cb);}
     });
     if(inf.k==='F'){rec.fd={x0:inf.i*S,z0:inf.j*S,top:inf.top};found.push(rec.fd);}
-    scene.add(g);occ[inf.key]=rec;pieces.push(rec);ghostKey='';sfx(200,.12);say('Поставлено: '+BN[inf.k]);
+    scene.add(g);occ[inf.key]=rec;pieces.push(rec);ghostKey='';
+    return rec;
+  }
+  function placePiece(){
+    if(!curOK||!curInfo){say('Сюда нельзя поставить');return;}
+    var inf={k:curInfo.k,i:curInfo.i,j:curInfo.j,t:curInfo.t,l:curInfo.l,key:curInfo.key};
+    buildPiece(inf);
+    sfx(200,.12);say('Поставлено: '+BN[inf.k]);
+    netEvent({t:'place',k:inf.k,i:inf.i,j:inf.j,tt:inf.t,l:inf.l,key:inf.key});
   }
   var jy=0,jvy=0,furnaces=[],furnEl=document.getElementById('furn'),fgh,fpos=null,fOK=false,curF=null;
-  function makeFurnace(x,z,ry){
+  function makeFurnace(x,z,ry,fid){
     var g=new THREE.Group(),y=groundAt(x,z),st=stoneMat(0xd0d0d4),dk=new THREE.MeshLambertMaterial({color:0x1d1b19});
     var b=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,1.1),st),t=new THREE.Mesh(new THREE.BoxGeometry(1.2,.12,1.2),st),o=new THREE.Mesh(new THREE.BoxGeometry(.6,.45,.1),dk),ch=new THREE.Mesh(new THREE.BoxGeometry(.3,.6,.3),st);
     var fl=new THREE.Mesh(new THREE.ConeGeometry(.18,.4,6),new THREE.MeshBasicMaterial({color:0xff8a2a}));
     b.position.y=.55;t.position.y=1.16;o.position.set(0,.45,.55);ch.position.set(-.3,1.5,-.2);fl.position.set(0,.45,.5);fl.visible=false;
     g.add(b,t,o,ch,fl);g.position.set(x,y,z);g.rotation.y=ry;scene.add(g);
-    var rec={x:x,z:z,r:.85,g:g,fl:fl,ore:0,wood:0,out:0,on:false,t:0};
+    var rec={x:x,z:z,r:.85,g:g,fl:fl,ore:0,wood:0,out:0,on:false,t:0,fid:fid||newFid()};
     g.userData.fur=rec;furnaces.push(rec);solids.push(rec);return rec;
   }
   function updFurGhost(){
@@ -951,9 +958,10 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function placeFurnace(){
     if(!fOK||!fpos){say('Сюда нельзя поставить');return;}
-    PL[curItem()].make(fpos.x,fpos.z,Math.atan2(P.x-fpos.x,P.z-fpos.z));
+    var nm=curItem(),ry=Math.atan2(P.x-fpos.x,P.z-fpos.z),rc=PL[nm].make(fpos.x,fpos.z,ry),px=fpos.x,pz=fpos.z;
     hot[sel].c--;if(hot[sel].c<=0)hot[sel]=null;
     renderSlots();sfx(180,.15);say('Поставлено');
+    netEvent({t:'furn',name:nm,x:px,z:pz,ry:ry,fid:rc&&rc.fid});
   }
   function tryUse(){
     if(!running||invOpen||bmOpen||!furnaces.length)return false;
@@ -973,12 +981,15 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function openFurn(f){curF=f;invOpen=true;furnEl.hidden=false;if(document.pointerLockElement)document.exitPointerLock();updFurnUI();}
   function closeFurn(){furnEl.hidden=true;curF=null;invOpen=false;}
   function furnAct(a){
-    var f=curF,n;if(!f)return;
-    if(a==='ore'){n=count('Железная руда');if(!n){say('Нет железной руды');return;}take('Железная руда',n);f.ore+=n;}
-    else if(a==='wood'){n=Math.min(50,count('Дерево'));if(!n){say('Нет дерева');return;}take('Дерево',n);f.wood+=n;}
-    else if(a==='take'){if(!f.out){say('Пока нечего забирать');return;}addItem('Железо','🔩',f.out,true);f.out=0;}
-    else{if(f.on)f.on=false;else if(f.ore>0&&f.wood>0){f.on=true;f.t=0;}else say('Нужны руда и дерево');}
-    renderSlots();updFurnUI();
+    var f=curF,n,ev=null;if(!f)return;
+    if(a==='ore'){n=count('Железная руда');if(!n){say('Нет железной руды');return;}take('Железная руда',n);f.ore+=n;ev={t:'fact',fid:f.fid,a:'ore',n:n};}
+    else if(a==='wood'){n=Math.min(50,count('Дерево'));if(!n){say('Нет дерева');return;}take('Дерево',n);f.wood+=n;ev={t:'fact',fid:f.fid,a:'wood',n:n};}
+    else if(a==='take'){if(!f.out){say('Пока нечего забирать');return;}addItem('Железо','🔩',f.out,true);f.out=0;ev={t:'fact',fid:f.fid,a:'take',n:0};}
+    else{
+      if(f.on)f.on=false;else if(f.ore>0&&f.wood>0){f.on=true;f.t=0;}else{say('Нужны руда и дерево');return;}
+      ev={t:'fact',fid:f.fid,a:'toggle',n:f.on?1:0};
+    }
+    renderSlots();updFurnUI();if(ev)netEvent(ev);
   }
   var camps=[];
   function makeCamp(x,z){
@@ -1119,8 +1130,9 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     arr[i]=null;picked=null;
     x=P.x-Math.sin(yaw)*1.8;z=P.z-Math.cos(yaw)*1.8;
     if(hAt(x,z)<.1){x=P.x;z=P.z;}
-    s=dropSprite(it);scene.add(s);drops.push({s:s,x:x,z:z,it:it});
+    s=dropSprite(it);scene.add(s);var uid=newFid();drops.push({s:s,x:x,z:z,it:it,uid:uid});
     renderSlots();say('Выброшено: '+it.n);sfx(160,.08);
+    netEvent({t:'drop',uid:uid,x:x,z:z,it:{n:it.n,i:it.i,c:it.c}});
   }
   function pickupDrop(){
     if(!running||invOpen)return;
@@ -1131,6 +1143,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     addItem(d.it.n,d.it.i,d.it.c,!!st);
     scene.remove(d.s);drops.splice(best,1);nearObj=null;
     renderSlots();say('Подобрано: '+d.it.n);
+    netEvent({t:'pick',uid:d.uid});
   }
   function updateWeapons(dt,t){
     var cur=curItem(),i,k,s,h,p,a,an,tq,b,b2,gone,pull,live=running&&!invOpen&&!bmOpen,d,near=null,nd=2.6,pa;
@@ -1236,8 +1249,8 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }else if(gp.d!==undefined&&gp.d<=6)pos=new THREE.Vector3(gp.x,groundAt(gp.x,gp.z)+.07,gp.z);
     if(!pos){say('Слишком далеко');return;}
     cool=.5;
-    m=makeSatchelMesh();m.position.copy(pos);m.rotation.y=Math.random()*6;scene.add(m);
-    satchels.push({m:m,pos:pos.clone(),t:0,lastBeep:-1});
+    spawnSatchel(pos);
+    netEvent({t:'sat',x:pos.x,y:pos.y,z:pos.z});
     hot[sel].c--;if(hot[sel].c<=0)hot[sel]=null;
     renderSlots();say('Сачель установлен. Отойди!');sfx(300,.1);
   }
@@ -1248,6 +1261,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     rec.cols.forEach(function(c){i=colliders.indexOf(c);if(i>=0)colliders.splice(i,1);});
     if(rec.fd){i=found.indexOf(rec.fd);if(i>=0)found.splice(i,1);}
     delete occ[rec.key];i=pieces.indexOf(rec);if(i>=0)pieces.splice(i,1);
+    logDel(function(e){return e.t==='place'&&e.key===rec.key;});
   }
   function pieceDist(rec,p){
     var best=1e9,k,m,g,dx,dy,dz;
@@ -1274,6 +1288,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       if(Math.hypot(f.x-pos.x,f.z-pos.z)<R){
         if(curF===f)closeFurn();
         scene.remove(f.g);k=solids.indexOf(f);if(k>=0)solids.splice(k,1);furnaces.splice(i,1);
+        logDel(function(e){return (e.t==='furn'||e.t==='fact')&&e.fid===f.fid;});
       }
     }
     ball=new THREE.Mesh(new THREE.SphereGeometry(1,12,10),new THREE.MeshBasicMaterial({color:0xffa040,transparent:true,opacity:.9}));
@@ -1336,7 +1351,8 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function gKey(x,z){return Math.floor(x/24)+','+Math.floor(z/24);}
   function gAdd(r){var k=gKey(r.x,r.z);(tgrid[k]||(tgrid[k]=[])).push(r);}
   function gDel(r){var a=tgrid[gKey(r.x,r.z)],i;if(a){i=a.indexOf(r);if(i>=0)a.splice(i,1);}}
-  function regNode(r){trees.push(r);gAdd(r);}
+  var nodeSeq=0,nodeById={};
+  function regNode(r){r.id=nodeSeq++;nodeById[r.id]=r;trees.push(r);gAdd(r);}
   function nearNodes(x,z){
     var ci=Math.floor(x/24),cj=Math.floor(z/24),out=[],i,j,k,a;
     for(j=cj-1;j<=cj+1;j++)for(i=ci-1;i<=ci+1;i++){a=tgrid[i+','+j];if(a)for(k=0;k<a.length;k++)out.push(a[k]);}
@@ -1661,6 +1677,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
         if(nickTaken(nick)){conn.send({t:'reject',reason:'Ник «'+nick+'» уже занят на этом сервере'});setTimeout(function(){conn.close();},300);return;}
         info.nick=nick;info.disp=dispName(nick);info.ok=true;net.conns[conn.peer]=info;
         conn.send({t:'welcome',id:conn.peer,seed:worldSeed,host:me?me.disp:''});
+        conn.send({t:'init',log:wlog});
         mpPlayers();say('Подключился: '+info.disp);
       }else if(!info.ok){return;}
       else if(m.t==='st'){m.n=info.disp;setRem(conn.peer,m);}
@@ -1821,7 +1838,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(t===lastHud)return;lastHud=t;e.textContent=t;e.hidden=!t;
   }
   function updateNet(dt){
-    updSrvHud();
+    updSrvHud();flushEv();
     var snap,id;
     netT+=dt;
     if(net.role&&netT>=.1){
@@ -1862,6 +1879,62 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }
   };
   bootAuth();
+  /* ---------- синхронизация мира: событие -> хост -> все остальные ---------- */
+  var evq=[],wlog=[],fSeq=0;
+  function newFid(){return (net.myId||'loc')+'-'+(++fSeq);}
+  function logDel(pred){var i;for(i=wlog.length-1;i>=0;i--)if(pred(wlog[i]))wlog.splice(i,1);}
+  function logEv(e){
+    if(net.role!=='host')return;
+    if(e.t==='pick'){logDel(function(x){return x.t==='drop'&&x.uid===e.uid;});return;}
+    if(e.t==='sat')return;
+    wlog.push(e);
+  }
+  function spawnSatchel(pos){
+    var m=makeSatchelMesh();m.position.copy(pos);m.rotation.y=Math.random()*6;scene.add(m);
+    satchels.push({m:m,pos:pos.clone(),t:0,lastBeep:-1});
+  }
+  function applyFact(e){
+    var i,f=null;
+    for(i=0;i<furnaces.length;i++)if(furnaces[i].fid===e.fid){f=furnaces[i];break;}
+    if(!f)return;
+    if(e.a==='ore')f.ore+=e.n;else if(e.a==='wood')f.wood+=e.n;else if(e.a==='take')f.out=0;else{f.on=!!e.n;f.t=0;}
+  }
+  function applyDead(id){
+    var r=nodeById[id],i;
+    if(!r||r.dead)return;
+    r.dead=true;scene.remove(r.g);if(r.die)r.die();if(r.cross)scene.remove(r.cross);
+    i=trees.indexOf(r);if(i>=0)trees.splice(i,1);
+  }
+  function applyDrop(e){
+    var i,s2;
+    for(i=0;i<drops.length;i++)if(drops[i].uid===e.uid)return;
+    s2=dropSprite(e.it);scene.add(s2);drops.push({s:s2,x:e.x,z:e.z,it:e.it,uid:e.uid});
+  }
+  function applyPick(e){
+    var i;
+    for(i=0;i<drops.length;i++)if(drops[i].uid===e.uid){scene.remove(drops[i].s);drops.splice(i,1);nearObj=null;return;}
+  }
+  function applyEv(e){
+    if(!e||!e.t)return;
+    if(!scene||!R){evq.push(e);return;}
+    switch(e.t){
+      case 'place':if(!occ[e.key])buildPiece({k:e.k,i:e.i,j:e.j,t:e.tt,l:e.l,key:e.key});break;
+      case 'furn':if(PL[e.name])PL[e.name].make(e.x,e.z,e.ry,e.fid);break;
+      case 'fact':applyFact(e);break;
+      case 'dead':applyDead(e.id);break;
+      case 'drop':applyDrop(e);break;
+      case 'pick':applyPick(e);break;
+      case 'sat':spawnSatchel(new THREE.Vector3(e.x,e.y,e.z));break;
+    }
+  }
+  function flushEv(){if(evq.length&&scene&&R){var q=evq;evq=[];q.forEach(applyEv);}}
+  function netEvent(e){
+    if(!net.role||(net.role==='client'&&!net.joined))return;
+    logEv(e);
+    netSend('ev',{e:e});
+  }
+  netOn('ev',function(m){logEv(m.e);applyEv(m.e);});
+  netOn('init',function(m){(m.log||[]).forEach(applyEv);});
   function pushOut(nx,nz,feet){
     var k,b,cx,cz,dx,dz,d,l,r,t,bt,m;
     for(k=0;k<colliders.length;k++){
