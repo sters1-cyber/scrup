@@ -2181,7 +2181,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       if(!m||!m.t)return;
       info.last=Date.now();
       if(m.t==='bye'){
-        if(info.ok){if(m.items)info.items=cleanItems(m.items);if(m.st&&typeof m.st==='object'){m.st.n=info.disp;setRem(conn.peer,m.st);}}
+        if(info.ok){if(m.items)info.items=cleanItems(m.items);if(!info.sleepKey&&m.st&&typeof m.st==='object'){m.st.n=info.disp;info.lastSt=m.st;setRem(conn.peer,m.st);}}
         kickConn(conn.peer,info);return;
       }
       if(m.t==='ping'){if(info.ok){if(rem[conn.peer])rem[conn.peer].seen=performance.now();if(m.items)info.items=cleanItems(m.items);}return;}
@@ -2194,14 +2194,17 @@ input[type=range]{width:150px;accent-color:var(--accent)}
         if(nickTaken(nick)){conn.send({t:'reject',reason:'Ник «'+nick+'» уже занят на этом сервере'});setTimeout(function(){conn.close();},300);return;}
         info.nick=nick;info.disp=dispName(nick);info.ok=true;info.last=Date.now();net.conns[conn.peer]=info;
         var skey=nick.toLowerCase(),ssl=sleepers[skey]||null,sdd=killed[skey]||null;
-        info.claim=skey;
-        conn.send({t:'welcome',id:conn.peer,seed:worldSeed,host:me?me.disp:'',sl:ssl?{x:ssl.x,y:ssl.y,z:ssl.z,yaw:ssl.yaw,hp:ssl.hp}:null,dead:(!ssl&&sdd)?sdd:null});
+        info.claim=skey;info.sleepKey=ssl?skey:null;if(ssl)info.items=ssl.items.slice();
+        conn.send({t:'welcome',id:conn.peer,seed:worldSeed,host:me?me.disp:'',sl:ssl?{x:ssl.x,y:ssl.y,z:ssl.z,yaw:ssl.yaw,hp:ssl.hp}:null,rm:ssl?(ssl.taken||[]):null,dead:(!ssl&&sdd)?sdd:null});
         conn.send({t:'init',log:wlog});
         mpPlayers();say('Подключился: '+info.disp);
       }else if(!info.ok){return;}
+      else if(slH[m.t]){slH[m.t](m,conn.peer,info);}
       else if(m.t==='st'){
-        m.n=info.disp;setRem(conn.peer,m);
-        if(info.claim){var ck=info.claim;info.claim=null;if(sleepers[ck]){delete sleepers[ck];dropRemote('z:'+ck);}delete killed[ck];}
+        m.n=info.disp;info.lastSt=m;
+        if(info.sleepKey)return;
+        setRem(conn.peer,m);
+        if(info.claim){var ck=info.claim;info.claim=null;delete killed[ck];}
       }
       else if(net.h[m.t]){net.h[m.t](m,conn.peer);broadcast(m,conn.peer);}
     });
@@ -2213,7 +2216,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var cur=net.conns[pid];
     if(cur&&cur!==info&&info){/* уже заменён новым подключением */return;}
     if(cur){delete net.conns[pid];}
-    if(info&&info.ok&&!info.gone&&rem[pid])makeSleeper(info.nick,info.disp,rem[pid].st,info.items);
+    if(info&&info.ok&&!info.gone&&!info.sleepKey)makeSleeper(info.nick,info.disp,info.lastSt||(rem[pid]&&rem[pid].st),info.items);
     dropRemote(pid);mpPlayers();
     try{if(info&&info.conn)info.conn.close();}catch(e){}
     if(info&&info.ok&&!info.gone){info.gone=true;say('Отключился: '+info.disp);if(net.role==='host'&&curSrv)dirBeat();}
@@ -2245,19 +2248,68 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   /* удар по спящему телу (обрабатывает только хост) */
   function sleeperHurt(key,d,from,w){
-    var sl=sleepers[key],uid;
+    var sl=sleepers[key],uid,oc=null,id;
     if(net.role!=='host'||!sl||!(d>0))return;
     sl.hp-=d;
     if(sl.hp<=0){
       delete sleepers[key];dropRemote('z:'+key);
+      for(id in net.conns)if(net.conns[id].sleepKey===key)oc=net.conns[id];
       uid=newFid();
       createCorpse(sl.disp,sl.x,sl.z,sl.yaw,sl.items||[],uid);
       netEvent({t:'corpse',uid:uid,nick:sl.disp,x:sl.x,z:sl.z,yw:sl.yaw,items:sl.items||[]});
-      killed[key]={by:from||'?',w:w||'—',x:sl.x,z:sl.z};
+      if(oc){oc.sleepKey=null;try{oc.conn.send({t:'sdie',by:from||'?',w:w||'—'});}catch(e){}}
+      else killed[key]={by:from||'?',w:w||'—',x:sl.x,z:sl.z};
       netSend('kill',{k:from||'?',v:sl.disp,w:w||'—'});
       say((from||'?')+' убил '+sl.disp+' (спал)');
     }
   }
+  /* обыск спящих: хост — главный. забрать предметы: list=[{i,n,c}] */
+  function slProcessTake(key,list){
+    var sl=sleepers[key],got=[],id,it,oc=null;
+    if(!sl)return got;
+    list.map(function(x){return {i:+x.i,n:String(x.n),c:+x.c};}).sort(function(p,q){return q.i-p.i;}).forEach(function(x){
+      it=sl.items[x.i];
+      if(it&&it.n===x.n&&it.c===x.c)got.push(sl.items.splice(x.i,1)[0]);
+    });
+    if(got.length){
+      for(id in net.conns)if(net.conns[id].sleepKey===key)oc=net.conns[id];
+      if(oc){try{oc.conn.send({t:'srm',items:got});}catch(e){}}
+      else sl.taken=(sl.taken||[]).concat(got.map(function(g){return {n:g.n,i:g.i,c:g.c};}));
+    }
+    return got;
+  }
+  var slH={
+    sq:function(m,pid,info){var sl=sleepers[String(m.k)];if(!sl)return;try{info.conn.send({t:'sitems',k:String(m.k),items:sl.items});}catch(e){}},
+    stake:function(m,pid,info){
+      var key=String(m.k),got=slProcessTake(key,Array.isArray(m.l)?m.l.slice(0,60):[]),sl=sleepers[key];
+      try{info.conn.send({t:'sgive',k:key,got:got,items:sl?sl.items:[]});}catch(e){}
+    },
+    wake:function(m,pid,info){
+      var key=info.sleepKey,sl=key&&sleepers[key];
+      if(!key)return;
+      if(m.items)info.items=cleanItems(m.items);
+      try{info.conn.send({t:'swake',hp:sl?sl.hp:100});}catch(e){}
+      delete sleepers[key];dropRemote('z:'+key);info.sleepKey=null;
+    },
+    sack:function(m,pid,info){var sl=info.sleepKey&&sleepers[info.sleepKey];if(sl)sl.taken=[];}
+  };
+  var slC={
+    sitems:function(m){if(lootC&&lootC.sl&&lootC.key===m.k){lootC.items=m.items||[];renderLoot();}},
+    sgive:function(m){
+      (m.got||[]).forEach(function(it){takeOne(it);});
+      if(lootC&&lootC.sl&&lootC.key===m.k)lootC.items=m.items||[];
+      if((m.got||[]).length){sfx(420,.08);say('Взято: '+m.got.length+' предм.');}else say('Предметы уже забрали');
+      renderSlots();renderLoot();
+    },
+    srm:function(m){(m.items||[]).forEach(function(it){take(it.n,it.c);});renderSlots();saveInv();say('Вас обыскали!');},
+    swake:function(m){plHP=clamp(+m.hp||plMax,1,plMax);plShown=-1;},
+    sdie:function(m){
+      wakeUp(true);
+      inv=new Array(40).fill(null);hot=[null,null,null,null,null,null];sel=0;saveInv();renderSlots();
+      deathX=P.x;deathZ=P.z;deathBy={by:String(m.by||'?'),w:String(m.w||'—')};
+      plDead=true;plHP=0;firing=false;draw=false;showDeath();
+    }
+  };
   /* проверка живых соединений: если 12 с тишины — игрок ушёл */
   setInterval(function(){
     var id,c,now=Date.now();
@@ -2295,6 +2347,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function onClientData(m){
     var id;
     if(!m||!m.t)return;
+    if(slC[m.t]){slC[m.t](m);return;}
     if(m.t==='reject'){mpStatus(m.reason||'Сервер отклонил подключение',true);net.joined=false;return;}
     if(m.t==='welcome'){
       clearTimeout(net.tmo);
@@ -2302,7 +2355,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
         if(R){lsSet('scrup-autojoin',JSON.stringify({id:net.hostId,seed:m.seed}));mpStatus('Перезагружаю страницу, чтобы построить мир хоста…');location.reload();return;}
         worldSeed=m.seed;
       }
-      joinPend=(m.sl||m.dead)?{sl:m.sl||null,dead:m.dead||null}:null;net.byeSent=false;
+      joinPend=(m.sl||m.dead)?{sl:m.sl||null,dead:m.dead||null,rm:m.rm||null}:null;net.byeSent=false;
       net.joined=true;mpStatus('Подключено к '+(m.host||'серверу')+'. Загружаю мир…');
       if(/^scrup-(s|official)-/.test(net.hostId))setInvKey('scrup-inv-'+net.hostId+'-'+me.nick.toLowerCase());else invKey=null;
       startGame();return;
@@ -2480,11 +2533,12 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     updHP();updCorpses(dt);
   }
   function sleepOn(){plSleep=true;var e=document.getElementById('sleepscr');if(e)e.hidden=false;}
-  function wakeUp(){
+  function wakeUp(q){
     var e=document.getElementById('sleepscr');
     if(e)e.hidden=true;
     if(!plSleep)return;
-    plSleep=false;keys={};say('Вы проснулись');
+    plSleep=false;keys={};if(!q)say('Вы проснулись');
+    if(net.role==='client'&&net.joined)netSend('wake',{items:myItems()});
   }
   window.addEventListener('keydown',function(e){if(plSleep&&running){e.stopImmediatePropagation();wakeUp();}},true);
   ['pointerdown','mousedown','touchstart'].forEach(function(ev){
@@ -2500,12 +2554,13 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }else if(jp.sl&&isFinite(+jp.sl.x)&&isFinite(+jp.sl.z)){
       j=jp.sl;P.x=+j.x;P.z=+j.z;P.y=P.by=hAt(P.x,P.z)+1.7;P.fy=undefined;jy=0;jvy=0;
       yaw=+j.yaw||0;pitch=-.15;plHP=clamp(+j.hp||plMax,1,plMax);plShown=-1;plLast=performance.now();
+      if(jp.rm&&jp.rm.length){jp.rm.forEach(function(it){take(it.n,it.c);});saveInv();renderSlots();}
       sleepOn();
+      if(net.role==='client'&&net.joined)netSend('sack',{});
     }
   }
   function hurtMe(d,from,w){
     if(!running||plDead||plSafe>0||!(d>0))return;
-    wakeUp();
     plHP-=d;plLast=performance.now();
     var fx=document.getElementById('dmgfx');
     if(fx){fx.classList.add('on');setTimeout(function(){fx.classList.remove('on');},90);}
@@ -2514,7 +2569,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     updHP();
   }
   function dieMe(from,w){
-    wakeUp();
+    wakeUp(true);
     var items=[],nick=me?me.disp:'Игрок',uid=newFid(),i;
     hot.concat(inv).forEach(function(x){if(x)items.push({n:x.n,i:x.i,c:x.c});});
     deathX=P.x;deathZ=P.z;deathBy={by:from||'?',w:w||'—'};
@@ -2630,8 +2685,45 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function lootCorpse(){
     var i,c,best=null,bd=2.6,d;
     for(i=0;i<corpses.length;i++){c=corpses[i];d=Math.hypot(c.x-P.x,c.z-P.z);if(d<bd&&c.items.length){bd=d;best=c;}}
-    if(!best)return false;
+    if(!best)return lootSleeper();
     openLoot(best);return true;
+  }
+  function lootSleeper(){
+    var id,r,best=null,bd=2.6,d,key,sl;
+    if(!net.role||(net.role==='client'&&!net.joined))return false;
+    for(id in rem){
+      if(id.indexOf('z:')!==0)continue;r=rem[id];if(!r.st)continue;
+      d=Math.hypot(r.st.x-P.x,r.st.z-P.z);if(d<bd){bd=d;best=id;}
+    }
+    if(!best)return false;
+    key=best.slice(2);
+    if(net.role==='host'){
+      sl=sleepers[key];if(!sl)return false;
+      openLoot({sl:1,key:key,nick:sl.disp,items:sl.items,uid:null});return true;
+    }
+    openLoot({sl:1,key:key,nick:rem[best].st.n||key,items:[],uid:null});
+    netSend('sq',{k:key});return true;
+  }
+  function sleeperTake(c,idxs){
+    var fh=0,fi=0,sim={},list=[],got,sl;
+    hot.forEach(function(x){if(!x)fh++;});inv.forEach(function(x){if(!x)fi++;});
+    idxs.forEach(function(k){
+      var it=c.items[k],st;
+      if(!it)return;
+      st=!!(ITEMS[it.n]&&ITEMS[it.n].s)||it.c>1;
+      if(st){
+        if(count(it.n)>0||sim[it.n])list.push({i:k,n:it.n,c:it.c});
+        else if(fi>0){fi--;sim[it.n]=1;list.push({i:k,n:it.n,c:it.c});}
+      }else if(fh>0){fh--;list.push({i:k,n:it.n,c:it.c});}
+      else if(fi>0){fi--;list.push({i:k,n:it.n,c:it.c});}
+    });
+    if(!list.length){say('Нет места в инвентаре');return;}
+    if(net.role==='host'){
+      sl=sleepers[c.key];if(!sl){closeLoot();say('Он уже проснулся');return;}
+      got=slProcessTake(c.key,list);
+      got.forEach(function(it){takeOne(it);});
+      c.items=sl.items;sfx(420,.08);say('Взято: '+got.length+' предм.');renderSlots();renderLoot();
+    }else netSend('stake',{k:c.key,l:list});
   }
   function openLoot(c){
     lootC=c;invOpen=true;if(document.pointerLockElement)document.exitPointerLock();
@@ -2644,7 +2736,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function renderLoot(){
     var g=document.getElementById('lw-slots'),c=lootC,e;
     if(!c)return;
-    document.getElementById('lw-title').textContent='Труп: '+c.nick;
+    document.getElementById('lw-title').textContent=(c.sl?'Спит: ':'Труп: ')+c.nick;
     g.textContent='';
     if(!c.items.length){e=document.createElement('div');e.className='lw-empty';e.textContent='Пусто';g.appendChild(e);return;}
     c.items.forEach(function(it,k){
@@ -2663,6 +2755,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function takeLoot(k){
     var c=lootC,it=c&&c.items[k];
     if(!it)return;
+    if(c.sl){sleeperTake(c,[k]);return;}
     if(!takeOne(it)){say('Нет места в инвентаре');return;}
     c.items.splice(k,1);sfx(420,.08);say('Взято: '+it.n+(it.c>1?' ×'+it.c:''));
     syncLoot();
@@ -2670,6 +2763,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function takeAllLoot(){
     var c=lootC,left=[],i,n=0;
     if(!c)return;
+    if(c.sl){sleeperTake(c,c.items.map(function(x,q){return q;}));return;}
     for(i=0;i<c.items.length;i++){if(takeOne(c.items[i]))n++;else left.push(c.items[i]);}
     c.items=left;sfx(420,.1);
     say(left.length?'Не хватило места в инвентаре':'Всё забрано');
