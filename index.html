@@ -155,6 +155,10 @@ input[type=range]{width:150px;accent-color:var(--accent)}
 .svpl.on{color:#7fc06a}.svpl.off{color:#d9684a}
 .svrow .gbtn{padding:9px 14px}
 .svempty{color:var(--muted);padding:20px;text-align:center}
+#sv-filters{display:flex;align-items:center;gap:14px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap;font-size:.9rem}
+#sv-filters input[type=text]{flex:1 1 160px;min-width:120px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:inherit;font:inherit}
+#sv-filters label{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+#sv-filters input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent,#e0732f);cursor:pointer}
 #sv-status{padding:8px 16px;font-size:.9rem;color:var(--muted);min-height:1.4em}
 #sv-new{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
 #sv-new[hidden]{display:none}
@@ -310,6 +314,12 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       <div id="sv-fav-add" hidden><input id="sv-id" placeholder="ID сервера" autocomplete="off" spellcheck="false"><button class="btn mini" id="sv-add">В избранное</button></div>
       <button class="btn mini" id="sv-refresh">Обновить</button>
       <button class="btn mini primary" id="sv-create">Создать сервер</button>
+    </div>
+    <div id="sv-filters">
+      <input type="text" id="sf-q" placeholder="Поиск по названию или ID…" autocomplete="off" spellcheck="false">
+      <label><input type="checkbox" id="sf-online"> Только онлайн</label>
+      <label><input type="checkbox" id="sf-full"> Не полные</label>
+      <label><input type="checkbox" id="sf-empty"> Не пустые</label>
     </div>
     <div id="sv-list"></div>
     <div id="sv-status"></div>
@@ -2191,6 +2201,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var info={conn:conn,nick:'',disp:'',ok:false};
     conn.on('data',function(m){
       if(!m||!m.t)return;
+      if(info.gone)return;
       info.last=Date.now();
       if(m.t==='bye'){
         if(info.ok){if(m.items)info.items=cleanItems(m.items);if(!info.sleepKey&&m.st&&typeof m.st==='object'){m.st.n=info.disp;info.lastSt=m.st;setRem(conn.peer,m.st);}}
@@ -2230,8 +2241,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(cur){delete net.conns[pid];}
     if(info&&info.ok&&!info.gone&&!info.sleepKey)makeSleeper(info.nick,info.disp,info.lastSt||(rem[pid]&&rem[pid].st),info.items);
     dropRemote(pid);mpPlayers();
+    if(info&&info.ok&&sleepers[String(info.nick).toLowerCase()]){var sk=String(info.nick).toLowerCase();setRem('z:'+sk,sleepSt(sleepers[sk]));}
     try{if(info&&info.conn)info.conn.close();}catch(e){}
-    if(info&&info.ok&&!info.gone){info.gone=true;say('Отключился: '+info.disp);if(net.role==='host'&&curSrv)dirBeat();}
+    if(info&&info.ok&&!info.gone){say('Отключился: '+info.disp);if(net.role==='host'&&curSrv)dirBeat();}
+    if(info)info.gone=true;
+    if(net.role==='host'){try{netPush();}catch(e){}}
   }
   /* тот же ник, но старое соединение молчит — это «призрак» закрытой вкладки: выкидываем */
   function kickStale(nick){
@@ -2494,6 +2508,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var id,r,now=performance.now(),k=Math.min(1,dt*12),st,da;
     for(id in rem){
       r=rem[id];
+      if(net.role==='host'&&id.indexOf('z:')!==0&&!net.conns[id]){dropRemote(id);continue;}
       if(now-r.seen>20000){dropRemote(id);continue;}
       if(!scene||!r.st)continue;
       st=r.st;
@@ -3245,7 +3260,12 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   var FAV_KEY='scrup-favs',MY_KEY='scrup-myservers';
   function srvKey(id){return 'scrup-srv-'+id;}
   function loadSrvData(id){try{return JSON.parse(lsGet(srvKey(id))||'null');}catch(e){return null;}}
-  function myList(){try{return JSON.parse(lsGet(MY_KEY)||'[]')||[];}catch(e){return [];}}
+  function rawMy(){try{return JSON.parse(lsGet(MY_KEY)||'[]')||[];}catch(e){return [];}}
+  /* «Мои серверы» — только те, которые создал именно этот аккаунт */
+  function myList(){
+    var k=me?me.nick.toLowerCase():'';
+    return rawMy().filter(function(m){var d=loadSrvData(m.id);return d&&String(d.owner||'').toLowerCase()===k;});
+  }
   function playersCount(){var n=1,id;for(id in net.conns)if(net.conns[id].ok)n++;return n;}
   function srvInfo(){return {id:curSrv.id,name:curSrv.name,owner:me?me.disp:'',players:playersCount(),max:curSrv.max,official:!!curSrv.official,created:curSrv.created};}
   function saveSrv(){
@@ -3424,12 +3444,23 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     document.querySelectorAll('.svtab').forEach(function(b){b.classList.toggle('on',b.dataset.tab===svTab);});
     document.getElementById('sv-title').textContent=SV_TITLES[svTab];
     document.getElementById('sv-fav-add').hidden=svTab!=='fav';
+    document.getElementById('sv-filters').hidden=svTab==='my';
+    var q=(document.getElementById('sf-q').value||'').trim().toLowerCase(),fOn=document.getElementById('sf-online').checked,fFull=document.getElementById('sf-full').checked,fEmp=document.getElementById('sf-empty').checked;
+    var vis=svList.filter(function(s){
+      if(q&&(String(s.name||'')+' '+s.id+' '+String(s.owner||'')).toLowerCase().indexOf(q)<0)return false;
+      if(svTab==='my')return true;
+      if(fOn&&s.online!==true)return false;
+      if(fFull&&s.online===true&&s.max&&(s.players||0)>=s.max)return false;
+      if(fEmp&&(s.online!==true||(s.players||0)<=1))return false;
+      return true;
+    });
+    if(svList.length&&!vis.length){em=document.createElement('div');em.className='svempty';em.textContent='Нет серверов, подходящих под фильтры.';list.appendChild(em);return;}
     if(!svList.length){
       em=document.createElement('div');em.className='svempty';
       em.textContent=svTab==='fav'?'Здесь пока пусто. Нажми ☆ у сервера или добавь его по ID.':svTab==='my'?'Ты ещё не создавал серверы. Нажми «Создать сервер».':'Список пуст.';
       list.appendChild(em);return;
     }
-    svList.forEach(function(s){
+    vis.forEach(function(s){
       var d=document.createElement('div'),st=document.createElement('button'),nm=document.createElement('div'),pl=document.createElement('div'),act=document.createElement('button'),a,b,del;
       d.className='svrow';
       st.className='svstar';st.textContent=isFav(s.id)?'★':'☆';st.title='Избранное';
@@ -3446,7 +3477,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
         del=document.createElement('button');del.className='gbtn';del.textContent='Удалить';
         del.onclick=function(){
           if(!confirm('Удалить сервер «'+s.name+'» вместе с миром?'))return;
-          lsSet(srvKey(s.id),'');lsSet(MY_KEY,JSON.stringify(myList().filter(function(x){return x.id!==s.id;})));loadSv();
+          lsSet(srvKey(s.id),'');lsSet(MY_KEY,JSON.stringify(rawMy().filter(function(x){return x.id!==s.id;})));loadSv();
         };
         d.appendChild(st);d.appendChild(nm);d.appendChild(pl);d.appendChild(act);d.appendChild(del);
       }else{
@@ -3508,7 +3539,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }
     if(!srv)srv={id:id,name:name,max:max,owner:me.nick,official:off,seed:(Math.random()*4294967296)>>>0,created:Date.now(),wlog:[],resp:[],savedAt:Date.now()};
     lsSet(srvKey(srv.id),JSON.stringify(srv));
-    list=myList();
+    list=rawMy();
     if(!list.some(function(x){return x.id===srv.id;})){list.push({id:srv.id,name:srv.name,created:srv.created});lsSet(MY_KEY,JSON.stringify(list));}
     document.getElementById('sv-new').hidden=true;
     startHost(srv);
@@ -3526,7 +3557,9 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     document.getElementById('sv-id').value='';loadSv();
   };
   document.querySelectorAll('.svtab').forEach(function(b){b.onclick=function(){svTab=b.dataset.tab;loadSv();};});
-  ['sn-name','sv-id'].forEach(function(i){document.getElementById(i).addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter'){if(i==='sn-name')createFull();else document.getElementById('sv-add').click();}});});
+  ['sf-online','sf-full','sf-empty'].forEach(function(i){document.getElementById(i).onchange=renderSv;});
+  document.getElementById('sf-q').addEventListener('input',renderSv);
+  ['sn-name','sv-id','sf-q'].forEach(function(i){document.getElementById(i).addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter'){if(i==='sn-name')createFull();else if(i==='sv-id')document.getElementById('sv-add').click();}});});
   bootAuth();
   function pushOut(nx,nz,feet){
     var k,b,cx,cz,dx,dz,d,l,r,t,bt,m;
