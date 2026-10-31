@@ -462,7 +462,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   <div id="bm" hidden>
     <button class="bo" data-k="F" style="left:50%;top:11%">Фундамент</button>
     <button class="bo" data-k="W" style="left:87%;top:38%">Стена</button>
-    <button class="bo" data-k="G" style="left:73%;top:82%">Гаражный проем</button>
+    <button class="bo" data-k="G" style="left:73%;top:82%">Большой проем</button>
     <button class="bo" data-k="D" style="left:27%;top:82%">Дверной проем</button>
     <button class="bo" data-k="R" style="left:13%;top:38%">Крыша</button>
     <div id="bcur"></div>
@@ -735,6 +735,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     {n:'Кровать',i:'🛏️',cat:'Строительство',y:1,s:true,c:{'Дерево':200,'Ткань':100}},
     {n:'Деревянная дверь',i:'🚪',cat:'Строительство',y:1,s:true,c:{'Дерево':300}},
     {n:'Гаражная дверь',i:'🚗',cat:'Строительство',y:1,s:true,c:{'Фрагменты металла':300}},
+    {n:'Двойная деревянная дверь',i:'🚪',cat:'Строительство',y:1,s:true,c:{'Дерево':600}},
     {n:'Код Лок',i:'🔐',cat:'Строительство',y:1,s:true,c:{'Фрагменты металла':100}},
     {n:'Веревка',i:'🪢',cat:'Материалы',y:1,s:true,c:{'Ткань':20}},
     {n:'Порох',i:'🧨',cat:'Материалы',y:1,s:true,c:{'Уголь':30,'Плавленая сера':20}}
@@ -848,7 +849,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(!running||invOpen||bmOpen||cool>0)return;
     if(curItem()==='Билд план'){cool=.25;if(!bsel)say('Зажми Tab и выбери, что строить');else placePiece();return;}
     if(curItem()==='Кровать'){cool=.3;placeBed();return;}
-    if(curItem()==='Деревянная дверь'||curItem()==='Гаражная дверь'){cool=.3;placeDoor();return;}
+    if(curItem()==='Деревянная дверь'||curItem()==='Гаражная дверь'||curItem()==='Двойная деревянная дверь'){cool=.3;placeDoor();return;}
     if(curItem()==='Код Лок'){cool=.3;placeLock();return;}
     if(PL[curItem()]){cool=.3;placeFurnace();return;}
     if(tryUse()){cool=.3;return;}
@@ -1058,7 +1059,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }
   }
   var BREACH=6,BREACH_UP=4.8,placeWhy='',S=3,ghost=null,ghostKey='',gmat,ray2,bsel=null,bmOpen=false,bmx=0,bmy=0,bmHover=null,tabT=0,colliders=[],found=[],occ={},pmat={},pick=[],curInfo=null,curParts=null,curOK=false;
-  var BN={F:'Фундамент',W:'Стена',D:'Дверной проем',G:'Гаражный проем',R:'Крыша'};
+  var BN={F:'Фундамент',W:'Стена',D:'Дверной проем',G:'Большой проем',R:'Крыша'};
   function curItem(){return hot[sel]?hot[sel].n:'';}
   function tmax(x0,z0,x1,z1){var m=-99,a,b;for(a=0;a<=3;a++)for(b=0;b<=3;b++)m=Math.max(m,hAt(x0+(x1-x0)*a/3,z0+(z1-z0)*b/3));return m;}
   function tmin(x0,z0,x1,z1){var m=99,a,b;for(a=0;a<=3;a++)for(b=0;b<=3;b++)m=Math.min(m,hAt(x0+(x1-x0)*a/3,z0+(z1-z0)*b/3));return m;}
@@ -1200,7 +1201,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function buildPiece(inf){
     var parts=partsOf(inf),g=new THREE.Group(),isC=inf.k==='F'||inf.k==='R';
-    var rec={c:isC?'C':'E',k:inf.k,t:inf.t,i:inf.i,j:inf.j,l:inf.l,top:inf.top,base:inf.base,g:g,cols:[],meshes:[],key:inf.key,fd:null,hp:({F:20,W:10,D:10,G:10,R:10})[inf.k]};
+    var rec={c:isC?'C':'E',k:inf.k,t:inf.t,i:inf.i,j:inf.j,l:inf.l,top:inf.top,base:inf.base,g:g,cols:[],meshes:[],key:inf.key,fd:null,hp:3};
     parts.forEach(function(p){
       var m=pmat[p.col]||(pmat[p.col]=woodMat(p.col)),b=new THREE.Mesh(new THREE.BoxGeometry(p.sx,p.sy,p.sz),m);
       b.position.set(p.x,p.y,p.z);b.userData.rec=rec;g.add(b);pick.push(b);rec.meshes.push(b);
@@ -1578,10 +1579,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     ray.setFromCamera({x:0,y:0},cam);ray.far=6;
     var objs=pick.slice(),k,hp,gp=aimPoint(),pos=null,m;
     for(k=0;k<trees.length;k++)objs.push(trees[k].g);
+    doorMeshes().forEach(function(dm){objs.push(dm);});
     hp=ray.intersectObjects(objs,true)[0];
     if(hp&&(gp.d===undefined||hp.distance<=gp.d+.05)){
       pos=hp.point.clone();
-      if(hp.object.userData.rec&&hp.face)pos.addScaledVector(hp.face.normal,.09);else pos.y+=.07;
+      if((hp.object.userData.rec||hp.object.userData.dr)&&hp.face)pos.addScaledVector(hp.face.normal,.09);else pos.y+=.07;
     }else if(gp.d!==undefined&&gp.d<=6)pos=new THREE.Vector3(gp.x,groundAt(gp.x,gp.z)+.07,gp.z);
     if(!pos){say('Слишком далеко');return;}
     cool=.5;
@@ -1612,14 +1614,44 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }
     return best;
   }
+  function doorMeshes(){
+    var out=[],i,j,d,m;
+    for(i=0;i<doors.length;i++){
+      d=doors[i];
+      if(d.garage){for(j=0;j<d.slats.length;j++){m=d.slats[j];if(m.visible){m.userData.dr=1;out.push(m);}}}
+      else if(d.dbl){for(j=0;j<2;j++){d.leaves[j].userData.dr=1;out.push(d.leaves[j]);}}
+      else{d.m.userData.dr=1;out.push(d.m);}
+    }
+    return out;
+  }
+  function sacW(n){var a=n%10,b=n%100;return n+(a===1&&b!==11?' сачель':(a>=2&&a<=4&&(b<10||b>=20)?' сачеля':' сачелей'));}
+  function doorDist(d,p){
+    var v=new THREE.Vector3(),hx,hy,hz,dx,dy,dz;
+    d.g.updateMatrixWorld(true);d.m.getWorldPosition(v);
+    if(d.big){hx=d.zt?.15:1.2;hy=1.1;hz=d.zt?1.2:.15;}
+    else{hx=d.gm.zt?.15:.7;hy=1.05;hz=d.gm.zt?.7:.15;}
+    dx=Math.max(Math.abs(p.x-v.x)-hx,0);dy=Math.max(Math.abs(p.y-v.y)-hy,0);dz=Math.max(Math.abs(p.z-v.z)-hz,0);
+    return Math.hypot(dx,dy,dz);
+  }
   function explode(pos){
     var R=4.5,i,k,an,f,ball;
-    var hitN=null,hd=1e9,pd;
-    for(i=pieces.length-1;i>=0;i--){
-      pd=pieceDist(pieces[i],pos);
-      if(pd<1.8){pieces[i].hp--;if(pd<hd){hd=pd;hitN=pieces[i];}if(pieces[i].hp<=0)destroyPiece(pieces[i]);}
+    var hitN=null,hd=1e9,pd,dh=null,dbest=.9,dn;
+    for(i=0;i<doors.length;i++){pd=doorDist(doors[i],pos);if(pd<dbest){dbest=pd;dh=doors[i];}}
+    if(dh){
+      /* сачель стоит на двери — бьёт только по двери */
+      dh.hp--;dn=dh.garage?'Гаражная дверь':(dh.dbl?'Двойная дверь':'Деревянная дверь');
+      if(dh.hp<=0){
+        k=dh.key;removeDoor(dh);
+        logDel(function(e){return (e.t==='door'||e.t==='dlock'||e.t==='dtog')&&e.key===k;});
+        say(dn+' разрушена');
+      }else say(dn+': нужно ещё '+sacW(dh.hp));
+    }else{
+      for(i=pieces.length-1;i>=0;i--){
+        pd=pieceDist(pieces[i],pos);
+        if(pd<1.8){pieces[i].hp--;if(pd<hd){hd=pd;hitN=pieces[i];}if(pieces[i].hp<=0)destroyPiece(pieces[i]);}
+      }
+      if(hitN)say(hitN.hp>0?BN[hitN.k]+': нужно ещё '+sacW(hitN.hp):BN[hitN.k]+' разрушена');
     }
-    if(hitN)say(hitN.hp>0?BN[hitN.k]+': нужно ещё '+hitN.hp+' сачелей':BN[hitN.k]+' разрушена');
     for(i=0;i<animals.length;i++){an=animals[i];if(!an.dead&&Math.hypot(an.x-pos.x,an.z-pos.z)<R*1.4)hitAnimal(an.g,300);}
     for(i=furnaces.length-1;i>=0;i--){
       f=furnaces[i];
@@ -2932,14 +2964,14 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function codeHash(key,code){var s=key+':'+code+':scrup',h=2166136261,i;for(i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h;}
   function doorGeom(pc){var zt=pc.t==='z',x0=pc.i*S,z0=pc.j*S;return {zt:zt,cx:zt?x0:x0+S/2,cz:zt?z0+S/2:z0,hx:zt?x0:x0+S/2-.6,hz:zt?z0+S/2-.6:z0,base:pc.base};}
   function doorByKey(k){var i;for(i=0;i<doors.length;i++)if(doors[i].key===k)return doors[i];return null;}
-  function makeDoor(pc,owner){
-    if(pc.k==='G')return makeGarage(pc,owner);
+  function makeDoor(pc,owner,dt0){
+    if(pc.k==='G')return dt0==='dbl'?makeDouble(pc,owner):makeGarage(pc,owner);
     var gm=doorGeom(pc),pv=new THREE.Group(),zt=gm.zt,m,h,rec,dk=new THREE.MeshLambertMaterial({color:0x2b2d30,flatShading:true});
     m=new THREE.Mesh(new THREE.BoxGeometry(zt?.07:1.18,DOOR_H,zt?1.18:.07),woodMat(0x9a7448));
     m.position.set(zt?0:.6,DOOR_H/2+.02,zt?.6:0);pv.add(m);
     h=new THREE.Mesh(new THREE.BoxGeometry(zt?.16:.05,.05,zt?.05:.16),dk);h.position.set(zt?0:1.0,1.0,zt?1.0:0);pv.add(h);
     pv.position.set(gm.hx,gm.base,gm.hz);scene.add(pv);
-    rec={key:pc.key,pc:pc,owner:owner,g:pv,m:m,open:false,ang:0,lock:null,lockM:null,gm:gm,
+    rec={hp:2,key:pc.key,pc:pc,owner:owner,g:pv,m:m,open:false,ang:0,lock:null,lockM:null,gm:gm,
       col:zt?{x0:gm.cx-.1,x1:gm.cx+.1,z0:gm.cz-.6,z1:gm.cz+.6,y0:gm.base,y1:gm.base+2.1}:{x0:gm.cx-.6,x1:gm.cx+.6,z0:gm.cz-.1,z1:gm.cz+.1,y0:gm.base,y1:gm.base+2.1}};
     colliders.push(rec.col);pc.door=rec;doors.push(rec);return rec;
   }
@@ -2953,7 +2985,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       dm=new THREE.MeshLambertMaterial({color:0x4a4f55,flatShading:true}),
       rb=new THREE.MeshLambertMaterial({color:0x23262a,flatShading:true});
     for(i=0;i<GAR_N;i++){
-      m=new THREE.Mesh(new THREE.BoxGeometry(zt?.07:2.4,sh*.94,zt?2.4:.07),i%2?m1:m2);
+      m=new THREE.Mesh(new THREE.BoxGeometry(zt?(i%2?.08:.07):2.4,sh*1.1,zt?2.4:(i%2?.08:.07)),i%2?m1:m2);
       g.add(m);slats.push(m);
     }
     /* барабан: вытянутый цилиндр над проёмом, ось вдоль стены */
@@ -2973,23 +3005,41 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     drum.position.set(zt?.2:0,GAR_H+.3,zt?0:.2);g.add(drum);
     anch=new THREE.Object3D();anch.position.set(0,1.1,0);g.add(anch);
     g.position.set(gm.cx,gm.base,gm.cz);scene.add(g);
-    rec={key:pc.key,pc:pc,owner:owner,g:g,m:anch,open:false,ang:0,lock:null,lockM:null,gm:gm,garage:true,p:0,slats:slats,drum:drum,zt:zt,sh:sh,
+    rec={hp:9,big:true,key:pc.key,pc:pc,owner:owner,g:g,m:anch,open:false,ang:0,lock:null,lockM:null,gm:gm,garage:true,p:0,slats:slats,drum:drum,zt:zt,sh:sh,
       lp:zt?[.12,1.2,1.05]:[1.05,1.2,.12],
       col:zt?{x0:gm.cx-.1,x1:gm.cx+.1,z0:gm.cz-1.2,z1:gm.cz+1.2,y0:gm.base,y1:gm.base+GAR_H}:{x0:gm.cx-1.2,x1:gm.cx+1.2,z0:gm.cz-.1,z1:gm.cz+.1,y0:gm.base,y1:gm.base+GAR_H}};
     colliders.push(rec.col);pc.door=rec;doors.push(rec);applyGarage(rec);return rec;
+  }
+
+  /* ---------- двойная деревянная дверь (в большой проём) ---------- */
+  function makeDouble(pc,owner){
+    var gm=doorGeom(pc),zt=gm.zt,g=new THREE.Group(),H=GAR_H,wm=woodMat(0x9a7448),dk=new THREE.MeshLambertMaterial({color:0x2b2d30,flatShading:true}),
+      leaves=[],pv=[],sg,m,h,rec,anch,q;
+    for(q=0;q<2;q++){
+      sg=q?-1:1;
+      pv[q]=new THREE.Group();pv[q].position.set(zt?0:-sg*1.2,0,zt?-sg*1.2:0);
+      m=new THREE.Mesh(new THREE.BoxGeometry(zt?.07:1.18,H,zt?1.18:.07),wm);
+      m.position.set(zt?0:sg*.6,H/2+.02,zt?sg*.6:0);pv[q].add(m);leaves.push(m);
+      h=new THREE.Mesh(new THREE.BoxGeometry(zt?.16:.05,.05,zt?.05:.16),dk);
+      h.position.set(zt?0:sg*1.05,1.0,zt?sg*1.05:0);pv[q].add(h);
+      g.add(pv[q]);
+    }
+    anch=new THREE.Object3D();anch.position.set(0,1.1,0);g.add(anch);
+    g.position.set(gm.cx,gm.base,gm.cz);scene.add(g);
+    rec={hp:4,big:true,dbl:true,key:pc.key,pc:pc,owner:owner,g:g,m:anch,open:false,ang:0,lock:null,lockM:null,gm:gm,zt:zt,pv:pv,leaves:leaves,
+      lp:zt?[.1,1.2,0]:[0,1.2,.1],
+      col:zt?{x0:gm.cx-.1,x1:gm.cx+.1,z0:gm.cz-1.2,z1:gm.cz+1.2,y0:gm.base,y1:gm.base+H}:{x0:gm.cx-1.2,x1:gm.cx+1.2,z0:gm.cz-.1,z1:gm.cz+.1,y0:gm.base,y1:gm.base+H}};
+    colliders.push(rec.col);pc.door=rec;doors.push(rec);return rec;
   }
   /* p: 0 закрыта … 1 открыта. Секции едут вверх, у проёма загибаются к барабану и «затягиваются» в него */
   function applyGarage(d){
     var e=d.p*d.p*(3-2*d.p),L=e*GAR_H,i,s,yc,u,sh=d.sh,ci=colliders.indexOf(d.col);
     for(i=0;i<d.slats.length;i++){
       s=d.slats[i];yc=L+i*sh+sh/2;
-      if(yc>=GAR_H-.04){s.visible=false;continue;}
+      if(yc-sh/2>=GAR_H-.01){s.visible=false;continue;}
       s.visible=true;
       u=Math.max(0,Math.min(1,(yc-(GAR_H-.55))/.55));
-      s.position.set(d.zt?u*u*.2:0,yc+.02,d.zt?0:u*u*.2);
-      s.scale.y=1-u*.5;
-      s.rotation.x=d.zt?0:u*1.0;
-      s.rotation.z=d.zt?-u*1.0:0;
+      s.position.set(d.zt?u*u*.1:0,yc+.02,d.zt?0:u*u*.1);
     }
     if(d.zt)d.drum.rotation.z=-L/GAR_R;else d.drum.rotation.x=L/GAR_R;
     if(L<1.85){if(ci<0)colliders.push(d.col);}else if(ci>=0)colliders.splice(ci,1);
@@ -3017,6 +3067,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function updDoors(dt){
     var i,d,tg;
     for(i=0;i<doors.length;i++){d=doors[i];
+      if(d.dbl){tg=d.open?1:0;if(Math.abs(tg-d.ang)>.001){d.ang+=(tg-d.ang)*Math.min(1,dt*6);if(Math.abs(tg-d.ang)<=.001)d.ang=tg;d.pv[0].rotation.y=-d.ang*Math.PI/2;d.pv[1].rotation.y=d.ang*Math.PI/2;}continue;}
       if(d.garage){tg=d.open?1:0;if(d.p!==tg){d.p+=Math.sign(tg-d.p)*Math.min(Math.abs(tg-d.p),dt*.5);applyGarage(d);}continue;}
       tg=d.open?-Math.PI/2:0;if(Math.abs(tg-d.ang)>.001){d.ang+=(tg-d.ang)*Math.min(1,dt*8);d.g.rotation.y=d.ang;}}
   }
@@ -3039,15 +3090,23 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function doorCenter(d){var v=new THREE.Vector3();d.g.updateMatrixWorld(true);d.m.getWorldPosition(v);return v;}
   function findDoor(){
     var i,d,v,best=null,bd=9,k;
-    for(i=0;i<doors.length;i++){d=doors[i];v=doorCenter(d);k=aimDist(v.x,v.y,v.z);if(k<(d.garage?1.4:.9)&&k<bd){bd=k;best=d;}}
+    for(i=0;i<doors.length;i++){
+      d=doors[i];v=doorCenter(d);k=aimDist(v.x,v.y,v.z);
+      if(d.big){
+        var o,ax=d.zt?0:1,az=d.zt?1:0;
+        for(o=-1;o<=1;o+=2){k=Math.min(k,aimDist(v.x+ax*o*.9,v.y,v.z+az*o*.9),aimDist(v.x+ax*o*.9,v.y-.6,v.z+az*o*.9),aimDist(v.x+ax*o*.9,v.y+.6,v.z+az*o*.9));}
+        k=Math.min(k,aimDist(v.x,v.y-.6,v.z),aimDist(v.x,v.y+.6,v.z));
+      }
+      if(k<(d.big?.75:.9)&&k<bd){bd=k;best=d;}
+    }
     return best;
   }
   function updDoorGhost(){
-    var cur=curItem(),on=running&&!invOpen&&!bmOpen&&(cur==='Деревянная дверь'||cur==='Гаражная дверь'||cur==='Код Лок'),t,gm,v;
+    var cur=curItem(),on=running&&!invOpen&&!bmOpen&&(cur==='Деревянная дверь'||cur==='Гаражная дверь'||cur==='Двойная деревянная дверь'||cur==='Код Лок'),t,gm,v;
     if(!on){if(doorGh)doorGh.visible=false;doorTgt=null;return;}
     if(!doorGh){doorGh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0x6fbf5f,transparent:true,opacity:.5,depthWrite:false}));scene.add(doorGh);}
-    if(cur==='Деревянная дверь'||cur==='Гаражная дверь'){
-      var gar=cur==='Гаражная дверь';
+    if(cur==='Деревянная дверь'||cur==='Гаражная дверь'||cur==='Двойная деревянная дверь'){
+      var gar=cur!=='Деревянная дверь';
       t=findDoorway(gar?'G':'D');doorTgt=t;doorOK=!!t;
       if(!t){doorGh.visible=false;return;}
       gm=doorGeom(t);
@@ -3063,11 +3122,12 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function placeDoor(){
     var pc=doorTgt;
-    if(!pc||!doorOK||pc.door||(curItem()==='Гаражная дверь')!==(pc.k==='G')){say(curItem()==='Гаражная дверь'?'Наведи на гаражный проём':'Наведи на дверной проём');return;}
-    makeDoor(pc,me?me.nick:'?');
+    var big=curItem()!=='Деревянная дверь',dt1=curItem()==='Двойная деревянная дверь'?'dbl':'gar';
+    if(!pc||!doorOK||pc.door||big!==(pc.k==='G')){say(big?'Наведи на большой проём':'Наведи на дверной проём');return;}
+    makeDoor(pc,me?me.nick:'?',dt1);
     hot[sel].c--;if(hot[sel].c<=0)hot[sel]=null;
-    renderSlots();sfx(180,.15);say(pc.k==='G'?'Гаражная дверь поставлена. Открыть — E':'Дверь поставлена. Код Лок — в руки и на дверь');
-    netEvent({t:'door',key:pc.key,owner:me?me.nick:'?'});
+    renderSlots();sfx(180,.15);say(pc.k==='G'?(dt1==='dbl'?'Двойная дверь поставлена. Открыть — E':'Гаражная дверь поставлена. Открыть — E'):'Дверь поставлена. Код Лок — в руки и на дверь');
+    netEvent({t:'door',key:pc.key,owner:me?me.nick:'?',dt:dt1});
   }
   function placeLock(){
     var d=doorTgt;
@@ -3238,7 +3298,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       case 'pick':applyPick(e);break;
       case 'bed':if(!findBed(e.id))makeBed(e.x,e.z,e.ry,e.id,e.owner,e.name);break;
       case 'bedname':var bq=findBed(e.id);if(bq)setBedName(bq,e.name);break;
-      case 'door':var dpc=occ[e.key];if(dpc&&!dpc.door)makeDoor(dpc,e.owner);break;
+      case 'door':var dpc=occ[e.key];if(dpc&&!dpc.door)makeDoor(dpc,e.owner,e.dt);break;
       case 'dlock':var dd1=doorByKey(e.key);if(dd1)setLock(dd1,e.ch);break;
       case 'dtog':var dd2=doorByKey(e.key);if(dd2)setDoorOpen(dd2,!!e.o);break;
       case 'bedrm':var br=findBed(e.id);if(br)removeBedLocal(br);break;
