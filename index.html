@@ -2170,13 +2170,17 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var info={conn:conn,nick:'',disp:'',ok:false};
     conn.on('data',function(m){
       if(!m||!m.t)return;
+      info.last=Date.now();
+      if(m.t==='bye'){kickConn(conn.peer,info);return;}
+      if(m.t==='ping')return;
       if(m.t==='info'){conn.send(Object.assign({t:'info'},curSrv?srvInfo():{name:'Локальная комната',owner:me?me.disp:'',players:playersCount(),max:16,official:false}));return;}
       if(m.t==='hello'){
         var nick=String(m.nick||'').trim();
         if(!/^[A-Za-z0-9_\u0410-\u044f\u0401\u0451]{3,16}$/.test(nick)){conn.send({t:'reject',reason:'Некорректный ник'});setTimeout(function(){conn.close();},300);return;}
+        kickStale(nick);
         if(curSrv&&playersCount()>=curSrv.max){conn.send({t:'reject',reason:'Сервер заполнен'});setTimeout(function(){conn.close();},300);return;}
         if(nickTaken(nick)){conn.send({t:'reject',reason:'Ник «'+nick+'» уже занят на этом сервере'});setTimeout(function(){conn.close();},300);return;}
-        info.nick=nick;info.disp=dispName(nick);info.ok=true;net.conns[conn.peer]=info;
+        info.nick=nick;info.disp=dispName(nick);info.ok=true;info.last=Date.now();net.conns[conn.peer]=info;
         conn.send({t:'welcome',id:conn.peer,seed:worldSeed,host:me?me.disp:''});
         conn.send({t:'init',log:wlog});
         mpPlayers();say('Подключился: '+info.disp);
@@ -2184,9 +2188,49 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       else if(m.t==='st'){m.n=info.disp;setRem(conn.peer,m);}
       else if(net.h[m.t]){net.h[m.t](m,conn.peer);broadcast(m,conn.peer);}
     });
-    conn.on('close',function(){delete net.conns[conn.peer];dropRemote(conn.peer);mpPlayers();if(info.ok)say('Отключился: '+info.disp);});
+    conn.on('close',function(){kickConn(conn.peer,info);});
     conn.on('error',function(){});
   }
+  /* убрать игрока с сервера (закрыл вкладку / пропала связь) */
+  function kickConn(pid,info){
+    var cur=net.conns[pid];
+    if(cur&&cur!==info&&info){/* уже заменён новым подключением */return;}
+    if(cur){delete net.conns[pid];}
+    dropRemote(pid);mpPlayers();
+    try{if(info&&info.conn)info.conn.close();}catch(e){}
+    if(info&&info.ok&&!info.gone){info.gone=true;say('Отключился: '+info.disp);if(net.role==='host'&&curSrv)dirBeat();}
+  }
+  /* тот же ник, но старое соединение молчит — это «призрак» закрытой вкладки: выкидываем */
+  function kickStale(nick){
+    var k=nick.toLowerCase(),id,c,now=Date.now();
+    for(id in net.conns){c=net.conns[id];
+      if(c.ok&&c.nick.toLowerCase()===k&&(now-(c.last||0)>5000||!c.conn.open))kickConn(id,c);}
+  }
+  /* проверка живых соединений: если 12 с тишины — игрок ушёл */
+  setInterval(function(){
+    var id,c,now=Date.now();
+    if(net.role!=='host')return;
+    for(id in net.conns){c=net.conns[id];
+      if(c.ok&&(now-(c.last||now)>12000||!c.conn.open))kickConn(id,c);}
+  },2000);
+  /* клиент шлёт ping независимо от requestAnimationFrame (работает и в фоновой вкладке) */
+  setInterval(function(){
+    if(net.role==='client'&&net.hostConn&&net.hostConn.open&&net.joined){try{net.hostConn.send({t:'ping'});}catch(e){}}
+  },2000);
+  /* при закрытии вкладки сразу сообщаем об уходе */
+  function netLeave(){
+    try{
+      if(net.role==='client'&&net.hostConn&&net.hostConn.open)net.hostConn.send({t:'bye'});
+      else if(net.role==='host'){
+        if(curSrv){saveSrv();dirUnreg(curSrv.id);}
+        broadcast({t:'hostbye'});
+      }
+    }catch(e){}
+    try{if(net.hostConn)net.hostConn.close();}catch(e){}
+    try{if(net.peer)net.peer.destroy();}catch(e){}
+  }
+  window.addEventListener('pagehide',netLeave);
+  window.addEventListener('beforeunload',netLeave);
   function onClientData(m){
     var id;
     if(!m||!m.t)return;
