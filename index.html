@@ -227,6 +227,33 @@ input[type=range]{width:150px;accent-color:var(--accent)}
 @keyframes dspulse{to{box-shadow:0 0 0 22px rgba(217,51,31,0)}}
 #ds-cap{font-size:.85rem;color:#c9bfae}
 #ds-resp{width:min(300px,80vw)}
+#deathscr{justify-content:flex-start;align-items:stretch;gap:0;padding:0}
+.ds-center{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px}
+.ds-center>:first-child{margin-top:auto}.ds-center>:last-child{margin-bottom:auto}
+#ds-beds{flex:none;display:flex;gap:8px;overflow-x:auto;justify-content:center;align-items:stretch;padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px);border-top:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.4)}
+.bedcard{flex:none;min-width:130px;text-align:center;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#f1e9dc;font:500 .9rem 'Rubik',system-ui,sans-serif;cursor:pointer}
+.bedcard:hover:not([disabled]){background:rgba(150,62,35,.6)}
+.bedcard[disabled]{opacity:.45;cursor:default}
+.bedcard em{display:block;font-style:normal;font-size:1.5rem}
+.bedcard small{display:block;color:#c9bfae}
+.ds-nobed{color:#c9bfae;align-self:center;font-size:.9rem;text-align:center}
+#bedwin{position:absolute;inset:0;z-index:25;background:rgba(8,10,8,.6);display:flex;align-items:center;justify-content:center}
+#bedwin[hidden]{display:none}
+#bw-name{width:100%;padding:10px;border-radius:6px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--ink);font:inherit}
+#codewin{position:absolute;inset:0;z-index:26;background:rgba(8,10,8,.6);display:flex;align-items:center;justify-content:center}
+#codewin[hidden]{display:none}
+#codewin .invbox{align-items:center;text-align:center;width:min(92vw,320px)}
+#kd-disp{font:700 2rem 'Rubik',monospace;letter-spacing:.45em;padding-left:.45em;min-height:2.6rem;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:6px;width:100%;line-height:2.6rem}
+#kd-msg{min-height:1.3em;color:#d9684a}
+#kd-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+#kd-pad .gbtn{text-align:center;font-size:1.3rem;padding:14px 0}
+#rotbtn{right:18px;bottom:calc(env(safe-area-inset-bottom,0px) + 250px)}
+#lootwin{position:absolute;inset:0;z-index:25;background:rgba(8,10,8,.6);display:flex;align-items:center;justify-content:center}
+#lootwin[hidden]{display:none}
+#lootwin .invbox{max-height:90vh;overflow-y:auto}
+#lw-slots .slot{cursor:pointer}
+#lw-slots .slot:hover{border-color:#c2602f}
+.lw-empty{grid-column:1/-1;color:var(--muted);text-align:center;padding:14px}
 </style>
 </head>
 <body>
@@ -349,11 +376,48 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   <div id="hotbar"></div>
   <div id="hpwrap"><div id="hpbar"><div id="hpfill"></div><div id="hptxt">100</div></div></div>
   <div id="dmgfx"></div>
+  <div id="lootwin" hidden>
+    <div class="invbox">
+      <h2 id="lw-title">Труп</h2>
+      <div class="mp-lbl">Нажми на предмет, чтобы забрать его:</div>
+      <div class="slots" id="lw-slots"></div>
+      <div class="fbtns">
+        <button class="gbtn" id="lw-all">Забрать всё</button>
+        <button class="gbtn" id="lw-close">Закрыть (E)</button>
+      </div>
+    </div>
+  </div>
+  <div id="bedwin" hidden>
+    <div class="invbox">
+      <h2>Кровать</h2>
+      <div class="mp-lbl" id="bw-owner"></div>
+      <input id="bw-name" maxlength="20" placeholder="Название кровати" autocomplete="off" spellcheck="false">
+      <div class="mp-lbl" id="bw-state"></div>
+      <div class="fbtns">
+        <button class="gbtn" id="bw-save">Сохранить название</button>
+        <button class="gbtn" id="bw-take">Забрать кровать</button>
+      </div>
+      <button class="btn" id="bw-close" style="padding:10px">Закрыть (E)</button>
+    </div>
+  </div>
+  <div id="codewin" hidden>
+    <div class="invbox">
+      <h2 id="kd-title">Код-замок</h2>
+      <div id="kd-disp"></div>
+      <div class="mp-lbl" id="kd-msg"></div>
+      <div id="kd-pad"></div>
+      <button class="btn" id="kd-close" style="padding:10px">Закрыть (E)</button>
+    </div>
+  </div>
+  <button class="tbtn" id="rotbtn" hidden>Повернуть</button>
   <div id="deathscr" hidden>
-    <div><h2>Вы погибли</h2><div id="ds-by"></div></div>
-    <div id="ds-map"><canvas id="ds-cv" width="450" height="450"></canvas><div id="ds-dot"></div></div>
-    <div id="ds-cap">Красная точка — место смерти</div>
-    <button class="btn primary" id="ds-resp">Возродиться</button>
+    <div class="ds-center">
+      <div><h2>Вы погибли</h2><div id="ds-by"></div></div>
+      <div id="ds-map"><canvas id="ds-cv" width="450" height="450"></canvas><div id="ds-dot"></div></div>
+      <div id="ds-cap">Красная точка — место смерти</div>
+      <button class="btn primary" id="ds-resp">Возродиться на старте</button>
+    </div>
+    <div id="ds-beds"></div>
   </div>
   <div id="bsel" hidden></div>
   <button class="tbtn" id="bbtn" hidden>Строить</button>
@@ -652,6 +716,9 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     {n:'Билд план',i:'📐',cat:'Строительство',y:1,s:false,c:{'Дерево':20}},
     {n:'Печка',i:'🏭',cat:'Строительство',y:1,s:true,c:{'Камень':200,'Дерево':100}},
     {n:'Костёр',i:'🔥',cat:'Строительство',y:1,s:true,c:{'Дерево':50}},
+    {n:'Кровать',i:'🛏️',cat:'Строительство',y:1,s:true,c:{'Дерево':200,'Ткань':100}},
+    {n:'Деревянная дверь',i:'🚪',cat:'Строительство',y:1,s:true,c:{'Дерево':300}},
+    {n:'Код Лок',i:'🔐',cat:'Строительство',y:1,s:true,c:{'Фрагменты металла':100}},
     {n:'Веревка',i:'🪢',cat:'Материалы',y:1,s:true,c:{'Ткань':20}},
     {n:'Порох',i:'🧨',cat:'Материалы',y:1,s:true,c:{'Уголь':30,'Плавленая сера':20}}
   ];
@@ -763,6 +830,9 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function strike(){
     if(!running||invOpen||bmOpen||cool>0)return;
     if(curItem()==='Билд план'){cool=.25;if(!bsel)say('Зажми Tab и выбери, что строить');else placePiece();return;}
+    if(curItem()==='Кровать'){cool=.3;placeBed();return;}
+    if(curItem()==='Деревянная дверь'){cool=.3;placeDoor();return;}
+    if(curItem()==='Код Лок'){cool=.3;placeLock();return;}
     if(PL[curItem()]){cool=.3;placeFurnace();return;}
     if(tryUse()){cool=.3;return;}
     cool=.4;swingT=.4;pend=true;
@@ -799,6 +869,9 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function toggleInv(){
     if(!running||plDead)return;
+    if(!lootEl.hidden){closeLoot();return;}
+    if(!bedEl.hidden){closeBedWin();return;}
+    if(!codeEl.hidden){closeCode();return;}
     if(!craftEl.hidden){craftEl.hidden=true;invOpen=false;invEl.hidden=true;return;}
     if(!furnEl.hidden){closeFurn();return;}
     if(!giveEl.hidden){toggleGive();return;}
@@ -1127,21 +1200,24 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function updFurGhost(){
     var on=running&&!invOpen&&!bmOpen&&PL[curItem()],gp,ok,k;
     if(!on){if(fgh)fgh.visible=false;return;}
-    if(!fgh){fgh=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,1.1),new THREE.MeshBasicMaterial({color:0x6fbf5f,transparent:true,opacity:.45,depthWrite:false}));scene.add(fgh);}
-    gp=aimPoint();ok=gp.d!==undefined&&gp.d<=7&&hAt(gp.x,gp.z)>.25&&depthAt(gp.x,gp.z)<.05&&!blockedPlace(gp.x,gp.z,on.r+.05,groundAt(gp.x,gp.z))&&Math.hypot(gp.x-P.x,gp.z-P.z)>on.r+.4;
+    if(!fgh){fgh=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,1.1),new THREE.MeshBasicMaterial({color:0x6fbf5f,transparent:true,opacity:.45,depthWrite:false}));var nub=new THREE.Mesh(new THREE.BoxGeometry(.35,.35,.25),fgh.material);nub.position.z=.62;fgh.add(nub);scene.add(fgh);}
+    gp=aimPoint();ok=gp.d!==undefined&&gp.d<=8&&hAt(gp.x,gp.z)>.25&&depthAt(gp.x,gp.z)<.05&&!blockedPlace(gp.x,gp.z,on.r+.05,groundAt(gp.x,gp.z))&&Math.hypot(gp.x-P.x,gp.z-P.z)>on.r+.4;
     for(k=0;ok&&k<trees.length;k++)if(Math.hypot(gp.x-trees[k].x,gp.z-trees[k].z)<trees[k].r+on.r+.05)ok=false;
     for(k=0;ok&&k<solids.length;k++)if(Math.hypot(gp.x-solids[k].x,gp.z-solids[k].z)<solids[k].r+on.r+.05)ok=false;
-    fpos=gp;fOK=ok;fgh.visible=true;fgh.scale.setScalar(on.s/1.1);fgh.position.set(gp.x,groundAt(gp.x,gp.z)+on.s/2,gp.z);fgh.material.color.setHex(ok?0x6fbf5f:0xc0503f);
+    fpos=gp;fOK=ok;fgh.visible=true;fgh.scale.setScalar(on.s/1.1);fgh.position.set(gp.x,groundAt(gp.x,gp.z)+on.s/2,gp.z);fgh.material.color.setHex(ok?0x6fbf5f:0xc0503f);fgh.rotation.y=yaw+Math.PI+bedAdd;
   }
   function placeFurnace(){
     if(!fOK||!fpos){say('Сюда нельзя поставить');return;}
-    var nm=curItem(),ry=Math.atan2(P.x-fpos.x,P.z-fpos.z),rc=PL[nm].make(fpos.x,fpos.z,ry),px=fpos.x,pz=fpos.z;
+    var nm=curItem(),ry=yaw+Math.PI+bedAdd,rc=PL[nm].make(fpos.x,fpos.z,ry),px=fpos.x,pz=fpos.z;
     hot[sel].c--;if(hot[sel].c<=0)hot[sel]=null;
     renderSlots();sfx(180,.15);say('Поставлено');
     netEvent({t:'furn',name:nm,x:px,z:pz,ry:ry,fid:rc&&rc.fid});
   }
   function tryUse(){
-    if(!running||invOpen||bmOpen||!furnaces.length)return false;
+    if(!running||invOpen||bmOpen)return false;
+    if(tryBed())return true;
+    if(useE&&tryDoor())return true;
+    if(!furnaces.length)return false;
     ray.setFromCamera({x:0,y:0},cam);ray.far=4.5;
     var h=ray.intersectObjects(furnaces.map(function(f){return f.g;}),true)[0],o;
     if(!h)return false;
@@ -1218,7 +1294,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   var PL={'Печка':{s:1.1,r:.85,make:makeFurnace},'Костёр':{s:.9,r:.6,make:makeCamp}};
   function updateFur(dt,t){
     var i,f;
-    updFurGhost();
+    updFurGhost();updBedGhost();updDoorGhost();updDoors(dt);
     for(i=0;i<camps.length;i++)camps[i].fl.scale.set(1,1+Math.sin(t*13+i*2)*.25,1);
     for(i=0;i<furnaces.length;i++){
       f=furnaces[i];f.fl.visible=f.on;
@@ -1486,12 +1562,14 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function destroyPiece(rec){
     var i;
+    if(rec.door)removeDoor(rec.door);
     scene.remove(rec.g);
     rec.meshes.forEach(function(m){i=pick.indexOf(m);if(i>=0)pick.splice(i,1);m.geometry.dispose();});
     rec.cols.forEach(function(c){i=colliders.indexOf(c);if(i>=0)colliders.splice(i,1);});
     if(rec.fd){i=found.indexOf(rec.fd);if(i>=0)found.splice(i,1);}
     delete occ[rec.key];i=pieces.indexOf(rec);if(i>=0)pieces.splice(i,1);
     logDel(function(e){return e.t==='place'&&e.key===rec.key;});
+    logDel(function(e){return (e.t==='door'||e.t==='dlock'||e.t==='dtog')&&e.key===rec.key;});
   }
   function pieceDist(rec,p){
     var best=1e9,k,m,g,dx,dy,dz;
@@ -2248,6 +2326,8 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       if(now-r.seen>6000){dropRemote(id);continue;}
       if(!scene||!r.st)continue;
       st=r.st;
+      if(r.goneAt&&st.dead===0&&now-r.goneAt>1500)r.goneAt=0;
+      if(st.dead||r.goneAt){if(r.av){scene.remove(r.av.g);r.av=null;}continue;}
       if(!r.av){r.av=makeAvatar(st.n||'Игрок');scene.add(r.av.g);r.av.g.position.set(st.x,st.y-1.7,st.z);}
       r.av.g.position.x+=(st.x-r.av.g.position.x)*k;
       r.av.g.position.y+=(st.y-1.7-r.av.g.position.y)*k;
@@ -2312,6 +2392,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function showDeath(){
     var el=document.getElementById('deathscr'),by=document.getElementById('ds-by'),c=document.getElementById('ds-cv'),g=c.getContext('2d'),dot=document.getElementById('ds-dot'),b1,b2;
+    closeLoot();closeBedWin();closeCode();
     if(!craftEl.hidden)craftEl.hidden=true;
     if(!furnEl.hidden)closeFurn();
     if(consEl&&!consEl.hidden)closeCons();
@@ -2328,16 +2409,22 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     dot.style.left=clamp((deathX+750)/1500*100,0,100)+'%';
     dot.style.top=clamp((1440-deathZ)/1500*100,0,100)+'%';
     el.hidden=false;
+    bedSig='';renderBedStrip();clearInterval(bedTick);bedTick=setInterval(renderBedStrip,1000);
   }
-  document.getElementById('ds-resp').onclick=function(){
+  var bedTick=0,bedSig='',bedCards=[];
+  function doRespawn(bd){
+    var x=0,z=30;
+    if(bd){x=bd.x;z=bd.z;bedUse(bd.id);}
     plDead=false;plHP=plMax;plSafe=3;plLast=performance.now();plShown=-1;
     hot[0]={n:'Булыжник',i:'🌑',c:1};sel=0;
-    P.x=0;P.z=30;P.y=P.by=hAt(0,30)+1.7;P.fy=undefined;jy=0;jvy=0;yaw=0;pitch=-.05;
+    P.x=x;P.z=z;P.y=P.by=groundAt(x,z)+1.7;P.fy=undefined;jy=0;jvy=0;yaw=bd?bd.ry+Math.PI:0;pitch=-.05;
+    clearInterval(bedTick);bedTick=0;
     document.getElementById('deathscr').hidden=true;invOpen=false;
-    renderSlots();updHP();saveInv();say('Вы возродились');
-  };
+    renderSlots();updHP();saveInv();say(bd?'Возрождение: '+bd.name:'Вы возродились');
+  }
+  document.getElementById('ds-resp').onclick=function(){doRespawn(null);};
   netOn('dmg',function(m){if(m&&m.to===net.myId)hurtMe(+m.d,m.from,m.w);});
-  netOn('kill',function(m){if(m)say(m.k+' убил '+m.v+(m.w&&m.w!=='—'?' ('+m.w+')':''));});
+  netOn('kill',function(m){var kid;if(m)for(kid in rem)if(rem[kid].st&&rem[kid].st.n===m.v)rem[kid].goneAt=performance.now();if(m)say(m.k+' убил '+m.v+(m.w&&m.w!=='—'?' ('+m.w+')':''));});
   function dealPlayer(id,d,w){
     var r=rem[id];if(!r||!net.role||(net.role==='client'&&!net.joined))return;
     netSend('dmg',{to:id,d:d,from:me?me.disp:'Игрок',w:w||'Кулак'});
@@ -2385,7 +2472,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     scene.add(holder);
     corpses.push({g:holder,av:av.g,x:x,z:z,items:items||[],uid:uid,nick:nick,f:0,life:300});
   }
-  function removeCorpse(c){var i=corpses.indexOf(c);scene.remove(c.g);if(i>=0)corpses.splice(i,1);if(corpNear===c)corpNear=null;}
+  function removeCorpse(c){var i=corpses.indexOf(c);if(lootC===c)closeLoot();scene.remove(c.g);if(i>=0)corpses.splice(i,1);if(corpNear===c)corpNear=null;}
   function updCorpses(dt){
     var i,c,e,near=null,nd=2.6,d;
     if(!scene)return;
@@ -2398,23 +2485,329 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }
     if(near!==corpNear){corpNear=near;if(near)say('E — обыскать труп: '+near.nick);}
   }
+  var lootEl=document.getElementById('lootwin'),lootC=null;
   function lootCorpse(){
-    var i,c,best=null,bd=2.6,d,it,before,left=[],got=0,st;
+    var i,c,best=null,bd=2.6,d;
     for(i=0;i<corpses.length;i++){c=corpses[i];d=Math.hypot(c.x-P.x,c.z-P.z);if(d<bd&&c.items.length){bd=d;best=c;}}
     if(!best)return false;
-    for(i=0;i<best.items.length;i++){
-      it=best.items[i];st=!!(ITEMS[it.n]&&ITEMS[it.n].s)||it.c>1;
-      before=count(it.n);
-      addItem(it.n,it.i,it.c,st);
-      if(count(it.n)-before>=it.c)got++;else left.push(it);
-    }
-    renderSlots();sfx(420,.1);
-    best.items=left;
-    if(!left.length){say('Вы обыскали труп: '+best.nick);netEvent({t:'cloot',uid:best.uid});removeCorpse(best);}
-    else{say('Не хватило места в инвентаре');netEvent({t:'cupd',uid:best.uid,items:left});}
-    corpNear=null;
-    return true;
+    openLoot(best);return true;
   }
+  function openLoot(c){
+    lootC=c;invOpen=true;if(document.pointerLockElement)document.exitPointerLock();
+    renderLoot();lootEl.hidden=false;corpNear=null;
+  }
+  function closeLoot(){
+    if(lootEl.hidden)return;
+    lootEl.hidden=true;lootC=null;invOpen=false;
+  }
+  function renderLoot(){
+    var g=document.getElementById('lw-slots'),c=lootC,e;
+    if(!c)return;
+    document.getElementById('lw-title').textContent='Труп: '+c.nick;
+    g.textContent='';
+    if(!c.items.length){e=document.createElement('div');e.className='lw-empty';e.textContent='Пусто';g.appendChild(e);return;}
+    c.items.forEach(function(it,k){
+      var d=slotEl(it);d.onclick=function(){takeLoot(k);};g.appendChild(d);
+    });
+  }
+  function takeOne(it){
+    var st=!!(ITEMS[it.n]&&ITEMS[it.n].s)||it.c>1,before=count(it.n);
+    addItem(it.n,it.i,it.c,st);
+    return count(it.n)-before>=it.c;
+  }
+  function syncLoot(){
+    renderSlots();renderLoot();
+    if(lootC)netEvent({t:'cupd',uid:lootC.uid,items:lootC.items});
+  }
+  function takeLoot(k){
+    var c=lootC,it=c&&c.items[k];
+    if(!it)return;
+    if(!takeOne(it)){say('Нет места в инвентаре');return;}
+    c.items.splice(k,1);sfx(420,.08);say('Взято: '+it.n+(it.c>1?' ×'+it.c:''));
+    syncLoot();
+  }
+  function takeAllLoot(){
+    var c=lootC,left=[],i,n=0;
+    if(!c)return;
+    for(i=0;i<c.items.length;i++){if(takeOne(c.items[i]))n++;else left.push(c.items[i]);}
+    c.items=left;sfx(420,.1);
+    say(left.length?'Не хватило места в инвентаре':'Всё забрано');
+    syncLoot();
+  }
+  document.getElementById('lw-all').onclick=takeAllLoot;
+  document.getElementById('lw-close').onclick=closeLoot;
+  /* ---------- кровати (спальники) ---------- */
+  var beds=[],bedSt={},bedLoaded=false,bedAdd=0,bedGh=null,bedPos=null,bedOK=false,bedEl=document.getElementById('bedwin'),bedCur=null;
+  var BED_USES=3,BED_CD=90000;
+  function bedKey(){return 'scrup-bedst-'+(me?me.nick.toLowerCase():'x');}
+  function loadBeds(){try{bedSt=JSON.parse(lsGet(bedKey())||'{}')||{};}catch(e){bedSt={};}bedLoaded=true;}
+  function saveBeds(){lsSet(bedKey(),JSON.stringify(bedSt));}
+  function bedState(id){
+    var s;if(!bedLoaded)loadBeds();
+    s=bedSt[id]||(bedSt[id]={u:0,cd:0});
+    if(s.cd&&Date.now()>=s.cd){s.u=0;s.cd=0;saveBeds();}
+    return s;
+  }
+  function bedUse(id){var s=bedState(id);s.u++;if(s.u>=BED_USES)s.cd=Date.now()+BED_CD;saveBeds();}
+  function fmtT(ms){var s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);}
+  function bedStatus(id){
+    var s=bedState(id);
+    if(s.cd)return {ok:false,t:'КД '+fmtT(s.cd-Date.now())};
+    return {ok:true,t:'Возрождений: '+(BED_USES-s.u)+' / '+BED_USES};
+  }
+  function myBeds(){return beds.filter(function(b){return me&&b.owner===me.nick;});}
+  function findBed(id){var i;for(i=0;i<beds.length;i++)if(beds[i].id===id)return beds[i];return null;}
+  function setBedName(b,name){
+    b.name=String(name||'Кровать').slice(0,20);
+  }
+  function makeBed(x,z,ry,id,owner,name){
+    var g=new THREE.Group(),wd=new THREE.MeshLambertMaterial({color:0x5a4128,flatShading:true}),mt=new THREE.MeshLambertMaterial({color:0xb04a3a,flatShading:true}),pw=new THREE.MeshLambertMaterial({color:0xe8e0cf,flatShading:true}),rec;
+    function bx(w,h,d,m,px,py,pz){var b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(px,py,pz);g.add(b);}
+    bx(.95,.14,1.95,wd,0,.27,0);
+    [[-.4,-.9],[.4,-.9],[-.4,.9],[.4,.9]].forEach(function(c){bx(.1,.2,.1,wd,c[0],.1,c[1]);});
+    bx(.85,.14,1.75,mt,0,.4,.05);
+    bx(.6,.1,.3,pw,0,.52,-.65);
+    bx(.95,.45,.08,wd,0,.45,-.97);
+    g.position.set(x,groundAt(x,z),z);g.rotation.y=ry;scene.add(g);
+    rec={id:id,x:x,z:z,ry:ry,owner:owner,name:'',g:g,lab:null};
+    g.userData.bed=rec;setBedName(rec,name);beds.push(rec);return rec;
+  }
+  function removeBedLocal(b){
+    var i=beds.indexOf(b);
+    if(bedCur===b)closeBedWin();
+    scene.remove(b.g);if(i>=0)beds.splice(i,1);
+  }
+  function updBedGhost(){
+    var on=running&&!invOpen&&!bmOpen&&curItem()==='Кровать',rb=document.getElementById('rotbtn'),k,gp,ok,ry,b;
+    if(rb)rb.hidden=!(running&&!invOpen&&!bmOpen&&(curItem()==='Кровать'||!!PL[curItem()]));
+    for(k=0;k<beds.length;k++){b=beds[k];if(b.lab)b.lab.visible=Math.hypot(b.x-P.x,b.z-P.z)<14;}
+    if(!on){if(bedGh)bedGh.visible=false;return;}
+    if(!bedGh){bedGh=new THREE.Mesh(new THREE.BoxGeometry(.95,.5,1.95),new THREE.MeshBasicMaterial({color:0x6fbf5f,transparent:true,opacity:.45,depthWrite:false}));scene.add(bedGh);}
+    gp=aimPoint();ry=yaw+bedAdd;
+    ok=gp.d!==undefined&&gp.d<=8&&hAt(gp.x,gp.z)>.25&&depthAt(gp.x,gp.z)<.05&&!blockedPlace(gp.x,gp.z,.85,groundAt(gp.x,gp.z))&&Math.hypot(gp.x-P.x,gp.z-P.z)>1.1;
+    for(k=0;ok&&k<trees.length;k++)if(Math.hypot(gp.x-trees[k].x,gp.z-trees[k].z)<trees[k].r+.85)ok=false;
+    for(k=0;ok&&k<solids.length;k++)if(Math.hypot(gp.x-solids[k].x,gp.z-solids[k].z)<solids[k].r+.85)ok=false;
+    for(k=0;ok&&k<beds.length;k++)if(Math.hypot(gp.x-beds[k].x,gp.z-beds[k].z)<1.6)ok=false;
+    bedPos={x:gp.x,z:gp.z,ry:ry};bedOK=ok;
+    bedGh.visible=true;bedGh.position.set(gp.x,groundAt(gp.x,gp.z)+.25,gp.z);bedGh.rotation.y=ry;
+    bedGh.material.color.setHex(ok?0x6fbf5f:0xc0503f);
+  }
+  function placeBed(){
+    if(!bedOK||!bedPos){say('Сюда нельзя поставить');return;}
+    var id=newFid()+'-'+Date.now().toString(36),name='Кровать '+(myBeds().length+1),nick=me?me.nick:'?',bp=bedPos;
+    makeBed(bp.x,bp.z,bp.ry,id,nick,name);
+    hot[sel].c--;if(hot[sel].c<=0)hot[sel]=null;
+    renderSlots();sfx(180,.15);say('Кровать поставлена. E — переименовать');
+    netEvent({t:'bed',id:id,x:bp.x,z:bp.z,ry:bp.ry,owner:nick,name:name});
+  }
+  function tryBed(){
+    if(!beds.length)return false;
+    ray.setFromCamera({x:0,y:0},cam);ray.far=4.5;
+    var h=ray.intersectObjects(beds.map(function(b){return b.g;}),true)[0],o;
+    if(!h)return false;
+    o=h.object;while(o&&!o.userData.bed)o=o.parent;
+    if(!o)return false;
+    openBedWin(o.userData.bed);return true;
+  }
+  function openBedWin(b){
+    var mine=me&&b.owner===me.nick,st;
+    bedCur=b;invOpen=true;if(document.pointerLockElement)document.exitPointerLock();
+    document.getElementById('bw-owner').textContent='Хозяин: '+b.owner;
+    document.getElementById('bw-name').value=b.name;
+    document.getElementById('bw-name').disabled=!mine;
+    document.getElementById('bw-save').hidden=!mine;
+    document.getElementById('bw-take').hidden=!mine;
+    if(mine){st=bedStatus(b.id);document.getElementById('bw-state').textContent=st.t+' (3 возрождения без КД, затем КД 1:30)';}
+    else document.getElementById('bw-state').textContent='Это чужая кровать — возродиться на ней нельзя.';
+    bedEl.hidden=false;
+  }
+  function closeBedWin(){
+    if(bedEl.hidden)return;
+    bedEl.hidden=true;bedCur=null;invOpen=false;
+    document.getElementById('bw-name').blur();
+  }
+  function saveBedName(){
+    var b=bedCur,v;if(!b||!me||b.owner!==me.nick)return;
+    v=document.getElementById('bw-name').value.trim().slice(0,20)||'Кровать';
+    setBedName(b,v);netEvent({t:'bedname',id:b.id,name:v});say('Название сохранено');
+  }
+  function takeBed(){
+    var b=bedCur;if(!b||!me||b.owner!==me.nick)return;
+    addItem('Кровать','🛏️',1,true);renderSlots();
+    netEvent({t:'bedrm',id:b.id});removeBedLocal(b);say('Кровать забрана');
+  }
+  document.getElementById('bw-save').onclick=saveBedName;
+  document.getElementById('bw-take').onclick=takeBed;
+  document.getElementById('bw-close').onclick=closeBedWin;
+  document.getElementById('rotbtn').addEventListener('pointerdown',function(e){e.preventDefault();bedAdd+=Math.PI/12;});
+  (function(){
+    var inp=document.getElementById('bw-name');
+    inp.addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter')saveBedName();else if(e.key==='Escape')closeBedWin();});
+    inp.addEventListener('keyup',function(e){e.stopPropagation();});
+  })();
+  function renderBedStrip(){
+    var box=document.getElementById('ds-beds'),list=myBeds(),sig=list.map(function(b){return b.id+'|'+b.name;}).join(','),lab;
+    if(sig!==bedSig){
+      bedSig=sig;box.textContent='';bedCards=[];
+      if(!list.length){lab=document.createElement('div');lab.className='ds-nobed';lab.textContent='У тебя нет кроватей. Крафт: 200 дерева + 100 ткани → «Строительство».';box.appendChild(lab);}
+      list.forEach(function(b){
+        var btn=document.createElement('button'),em=document.createElement('em'),nm=document.createElement('span'),sm=document.createElement('small');
+        btn.className='bedcard';em.textContent='🛏️';nm.textContent=b.name;
+        btn.appendChild(em);btn.appendChild(nm);btn.appendChild(sm);
+        btn.onclick=function(){if(bedStatus(b.id).ok&&plDead)doRespawn(b);};
+        box.appendChild(btn);bedCards.push({b:b,btn:btn,sm:sm});
+      });
+    }
+    bedCards.forEach(function(c){var s=bedStatus(c.b.id);c.sm.textContent=s.t;c.btn.disabled=!s.ok;});
+  }
+  /* ---------- двери и код-замки ---------- */
+  var doors=[],doorGh=null,doorTgt=null,doorOK=false,codeEl=document.getElementById('codewin'),codeCur=null,codeMode='',codeBuf='',doorAuth={},useE=false;
+  var DOOR_H=2.05;
+  function tryUseE(){useE=true;var r=tryUse();useE=false;return r;}
+  function codeHash(key,code){var s=key+':'+code+':scrup',h=2166136261,i;for(i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h;}
+  function doorGeom(pc){var zt=pc.t==='z',x0=pc.i*S,z0=pc.j*S;return {zt:zt,cx:zt?x0:x0+S/2,cz:zt?z0+S/2:z0,hx:zt?x0:x0+S/2-.6,hz:zt?z0+S/2-.6:z0,base:pc.base};}
+  function doorByKey(k){var i;for(i=0;i<doors.length;i++)if(doors[i].key===k)return doors[i];return null;}
+  function makeDoor(pc,owner){
+    var gm=doorGeom(pc),pv=new THREE.Group(),zt=gm.zt,m,h,rec,dk=new THREE.MeshLambertMaterial({color:0x2b2d30,flatShading:true});
+    m=new THREE.Mesh(new THREE.BoxGeometry(zt?.07:1.18,DOOR_H,zt?1.18:.07),woodMat(0x9a7448));
+    m.position.set(zt?0:.6,DOOR_H/2+.02,zt?.6:0);pv.add(m);
+    h=new THREE.Mesh(new THREE.BoxGeometry(zt?.16:.05,.05,zt?.05:.16),dk);h.position.set(zt?0:1.0,1.0,zt?1.0:0);pv.add(h);
+    pv.position.set(gm.hx,gm.base,gm.hz);scene.add(pv);
+    rec={key:pc.key,pc:pc,owner:owner,g:pv,m:m,open:false,ang:0,lock:null,lockM:null,gm:gm,
+      col:zt?{x0:gm.cx-.1,x1:gm.cx+.1,z0:gm.cz-.6,z1:gm.cz+.6,y0:gm.base,y1:gm.base+2.1}:{x0:gm.cx-.6,x1:gm.cx+.6,z0:gm.cz-.1,z1:gm.cz+.1,y0:gm.base,y1:gm.base+2.1}};
+    colliders.push(rec.col);pc.door=rec;doors.push(rec);return rec;
+  }
+  function removeDoor(d){
+    var i=colliders.indexOf(d.col);if(i>=0)colliders.splice(i,1);
+    if(codeCur===d)closeCode();
+    scene.remove(d.g);i=doors.indexOf(d);if(i>=0)doors.splice(i,1);
+    if(d.pc)d.pc.door=null;
+  }
+  function setDoorOpen(d,o){
+    var i=colliders.indexOf(d.col);
+    d.open=!!o;
+    if(o){if(i>=0)colliders.splice(i,1);}else if(i<0)colliders.push(d.col);
+  }
+  function setLock(d,ch){
+    var zt=d.gm.zt;
+    d.lock={ch:ch};
+    if(!d.lockM){
+      d.lockM=new THREE.Mesh(new THREE.BoxGeometry(zt?.17:.14,.24,zt?.14:.17),new THREE.MeshLambertMaterial({color:0x4a4f55,flatShading:true}));
+      d.lockM.position.set(zt?0:1.0,1.25,zt?1.0:0);d.g.add(d.lockM);
+    }
+  }
+  function updDoors(dt){
+    var i,d,tg;
+    for(i=0;i<doors.length;i++){d=doors[i];tg=d.open?-Math.PI/2:0;if(Math.abs(tg-d.ang)>.001){d.ang+=(tg-d.ang)*Math.min(1,dt*8);d.g.rotation.y=d.ang;}}
+  }
+  function aimDist(x,y,z){
+    var d=new THREE.Vector3(),vx,vy,vz,t;
+    cam.getWorldDirection(d);
+    vx=x-cam.position.x;vy=y-cam.position.y;vz=z-cam.position.z;t=vx*d.x+vy*d.y+vz*d.z;
+    if(t<.2||t>6)return 1e9;
+    return Math.hypot(vx-d.x*t,vy-d.y*t,vz-d.z*t);
+  }
+  function findDoorway(){
+    var i,pc,gm,best=null,bd=1.0,d;
+    for(i=0;i<pieces.length;i++){
+      pc=pieces[i];if(pc.k!=='D'||pc.door||pc.base==null)continue;
+      gm=doorGeom(pc);d=aimDist(gm.cx,gm.base+1.05,gm.cz);
+      if(d<bd){bd=d;best=pc;}
+    }
+    return best;
+  }
+  function doorCenter(d){var v=new THREE.Vector3();d.g.updateMatrixWorld(true);d.m.getWorldPosition(v);return v;}
+  function findDoor(){
+    var i,d,v,best=null,bd=.9,k;
+    for(i=0;i<doors.length;i++){d=doors[i];v=doorCenter(d);k=aimDist(v.x,v.y,v.z);if(k<bd){bd=k;best=d;}}
+    return best;
+  }
+  function updDoorGhost(){
+    var cur=curItem(),on=running&&!invOpen&&!bmOpen&&(cur==='Деревянная дверь'||cur==='Код Лок'),t,gm,v;
+    if(!on){if(doorGh)doorGh.visible=false;doorTgt=null;return;}
+    if(!doorGh){doorGh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0x6fbf5f,transparent:true,opacity:.5,depthWrite:false}));scene.add(doorGh);}
+    if(cur==='Деревянная дверь'){
+      t=findDoorway();doorTgt=t;doorOK=!!t;
+      if(!t){doorGh.visible=false;return;}
+      gm=doorGeom(t);doorGh.scale.set(gm.zt?.12:1.2,DOOR_H,gm.zt?1.2:.12);doorGh.position.set(gm.cx,gm.base+DOOR_H/2+.02,gm.cz);
+    }else{
+      t=findDoor();doorTgt=t;doorOK=!!t&&!t.lock&&!!me&&t.owner===me.nick;
+      if(!t){doorGh.visible=false;return;}
+      v=new THREE.Vector3(t.gm.zt?0:1.0,1.25,t.gm.zt?1.0:0);t.g.updateMatrixWorld(true);t.g.localToWorld(v);
+      doorGh.scale.set(.3,.34,.3);doorGh.position.copy(v);
+    }
+    doorGh.rotation.y=0;doorGh.visible=true;doorGh.material.color.setHex(doorOK?0x6fbf5f:0xc0503f);
+  }
+  function placeDoor(){
+    var pc=doorTgt;
+    if(!pc||!doorOK||pc.door){say('Наведи на дверной проём');return;}
+    makeDoor(pc,me?me.nick:'?');
+    hot[sel].c--;if(hot[sel].c<=0)hot[sel]=null;
+    renderSlots();sfx(180,.15);say('Дверь поставлена. Код Лок — в руки и на дверь');
+    netEvent({t:'door',key:pc.key,owner:me?me.nick:'?'});
+  }
+  function placeLock(){
+    var d=doorTgt;
+    if(!d){say('Наведи на дверь');return;}
+    if(d.lock){say('На двери уже стоит код-замок');return;}
+    if(!me||d.owner!==me.nick){say('Это не твоя дверь');return;}
+    openCode('set',d);
+  }
+  function tryDoor(){
+    var d=findDoor();
+    if(!d)return false;
+    if(d.open){setDoorOpen(d,false);sfx(200,.12);netEvent({t:'dtog',key:d.key,o:0});return true;}
+    if(!d.lock||doorAuth[d.key]){setDoorOpen(d,true);sfx(260,.12);netEvent({t:'dtog',key:d.key,o:1});return true;}
+    openCode('enter',d);return true;
+  }
+  function openCode(mode,d){
+    codeMode=mode;codeCur=d;codeBuf='';invOpen=true;
+    if(document.pointerLockElement)document.exitPointerLock();
+    document.getElementById('kd-title').textContent=mode==='set'?'Задай код (4 цифры)':'Введи код';
+    renderCode('');codeEl.hidden=false;
+  }
+  function closeCode(){
+    if(codeEl.hidden)return;
+    codeEl.hidden=true;codeCur=null;codeBuf='';invOpen=false;
+  }
+  function renderCode(msg){
+    var s='',i;
+    for(i=0;i<4;i++)s+=i<codeBuf.length?(codeMode==='set'?codeBuf[i]:'•'):'–';
+    document.getElementById('kd-disp').textContent=s;
+    document.getElementById('kd-msg').textContent=msg||'';
+  }
+  function codeKey(k){
+    if(k==='B'){codeBuf=codeBuf.slice(0,-1);renderCode('');}
+    else if(k==='OK')submitCode();
+    else if(codeBuf.length<4){codeBuf+=k;renderCode('');}
+  }
+  function submitCode(){
+    var d=codeCur,ch;
+    if(!d)return;
+    if(codeBuf.length<4){renderCode('Нужно 4 цифры');return;}
+    if(codeMode==='set'){
+      if(curItem()!=='Код Лок'||d.lock){closeCode();return;}
+      ch=codeHash(d.key,codeBuf);
+      hot[sel].c--;if(hot[sel].c<=0)hot[sel]=null;
+      setLock(d,ch);doorAuth[d.key]=true;renderSlots();
+      netEvent({t:'dlock',key:d.key,ch:ch});
+      sfx(300,.12);say('Код-замок установлен');closeCode();return;
+    }
+    if(d.lock&&codeHash(d.key,codeBuf)===d.lock.ch){
+      doorAuth[d.key]=true;setDoorOpen(d,true);sfx(260,.12);
+      netEvent({t:'dtog',key:d.key,o:1});say('Код верный');closeCode();return;
+    }
+    codeBuf='';renderCode('Неверный код! −20 HP');
+    hurtMe(20,'Код Лок','Неверный код');
+  }
+  (function(){
+    var pad=document.getElementById('kd-pad');
+    ['1','2','3','4','5','6','7','8','9','B','0','OK'].forEach(function(k){
+      var b=document.createElement('button');b.className='gbtn';b.textContent=k==='B'?'⌫':(k==='OK'?'✔':k);
+      b.onclick=function(){codeKey(k);};pad.appendChild(b);
+    });
+    document.getElementById('kd-close').onclick=closeCode;
+  })();
   function updateNet(dt){
     updHPt(dt);updSrvHud();flushEv();updBushHint(dt);updResp(dt);flushLoad();srvTimers(dt);
     var snap,id;
@@ -2463,6 +2856,10 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function logEv(e){
     if(net.role!=='host')return;
     if(e.t==='cloot'){logDel(function(x){return (x.t==='corpse'||x.t==='cupd')&&x.uid===e.uid;});return;}
+    if(e.t==='bedrm'){logDel(function(x){return (x.t==='bed'||x.t==='bedname')&&x.id===e.id;});return;}
+    if(e.t==='dtog')logDel(function(x){return x.t==='dtog'&&x.key===e.key;});
+    if(e.t==='dlock')logDel(function(x){return x.t==='dlock'&&x.key===e.key;});
+    if(e.t==='bedname')logDel(function(x){return x.t==='bedname'&&x.id===e.id;});
     if(e.t==='cupd')logDel(function(x){return x.t==='cupd'&&x.uid===e.uid;});
     if(e.t==='pick'){logDel(function(x){return x.t==='drop'&&x.uid===e.uid;});return;}
     if(e.t==='sat')return;
@@ -2508,8 +2905,14 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       case 'resp':respawnNode(nodeById[e.id]);break;
       case 'drop':applyDrop(e);break;
       case 'pick':applyPick(e);break;
+      case 'bed':if(!findBed(e.id))makeBed(e.x,e.z,e.ry,e.id,e.owner,e.name);break;
+      case 'bedname':var bq=findBed(e.id);if(bq)setBedName(bq,e.name);break;
+      case 'door':var dpc=occ[e.key];if(dpc&&!dpc.door)makeDoor(dpc,e.owner);break;
+      case 'dlock':var dd1=doorByKey(e.key);if(dd1)setLock(dd1,e.ch);break;
+      case 'dtog':var dd2=doorByKey(e.key);if(dd2)setDoorOpen(dd2,!!e.o);break;
+      case 'bedrm':var br=findBed(e.id);if(br)removeBedLocal(br);break;
       case 'corpse':if(!findCorpse(e.uid))createCorpse(e.nick,e.x,e.z,e.yw,e.items||[],e.uid);break;
-      case 'cupd':var cq=findCorpse(e.uid);if(cq)cq.items=e.items||[];break;
+      case 'cupd':var cq=findCorpse(e.uid);if(cq){cq.items=e.items||[];if(lootC===cq)renderLoot();}break;
       case 'cloot':var cr2=findCorpse(e.uid);if(cr2)removeCorpse(cr2);break;
       case 'sat':spawnSatchel(new THREE.Vector3(e.x,e.y,e.z));break;
     }
@@ -2928,7 +3331,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(plDead)showDeath();
   }
   function stopGame(){
-    saveSrv();saveInv();
+    closeLoot();closeBedWin();closeCode();saveSrv();saveInv();
     running=false;cancelAnimationFrame(raf);invOpen=false;invEl.hidden=true;giveEl.hidden=true;stopAudio();bmOpen=false;document.getElementById('bm').hidden=true;if(ghost)ghost.visible=false;if(furnEl)closeFurn();if(consEl&&!consEl.hidden)closeCons();craftEl.hidden=true;
     if(document.exitPointerLock&&document.pointerLockElement)document.exitPointerLock();
     show('menu');
@@ -2936,10 +3339,16 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   window.addEventListener('resize',function(){if(running&&R)resize();});
   window.addEventListener('keydown',function(e){
     if(!running||plDead)return;
+    if(!codeEl.hidden){
+      if(/^[0-9]$/.test(e.key)){e.preventDefault();codeKey(e.key);return;}
+      if(e.key==='Backspace'){e.preventDefault();codeKey('B');return;}
+      if(e.key==='Enter'){e.preventDefault();codeKey('OK');return;}
+    }
     if(e.key==='`'||e.key==='~'||e.key==='ё'||e.key==='Ё'){e.preventDefault();if(!e.repeat&&consEl.hidden)openCons();return;}
     if(e.key==='F1'){e.preventDefault();if(!e.repeat)toggleGive();return;}
-    if((e.key==='e'||e.key==='у')&&!e.repeat){if(!furnEl.hidden)closeFurn();else if(!tryUse()&&!tryCollect())pickupDrop();return;}
+    if((e.key==='e'||e.key==='у')&&!e.repeat){if(!lootEl.hidden)closeLoot();else if(!bedEl.hidden)closeBedWin();else if(!furnEl.hidden)closeFurn();else if(!codeEl.hidden)closeCode();else if(!tryUseE()&&!tryCollect())pickupDrop();return;}
     if((e.key==='g'||e.key==='G'||e.key==='п'||e.key==='П')&&!e.repeat){dropHover();return;}
+    if((e.key==='r'||e.key==='R'||e.key==='к'||e.key==='К')&&(curItem()==='Кровать'||PL[curItem()])&&!invOpen){bedAdd+=Math.PI/12;return;}
     if(e.key==='Tab'){e.preventDefault();if(e.repeat)return;if(curItem()==='Билд план'&&!invOpen){openBM();}else toggleInv();return;}
     if(/^[1-6]$/.test(e.key)){sel=+e.key-1;renderSlots();return;}
     keys[e.key.toLowerCase()]=true;if(e.key.indexOf('Arrow')===0||e.key===' ')e.preventDefault();
@@ -2991,7 +3400,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   document.getElementById('open-settings').onclick=function(){show('settings');};
   document.getElementById('back-settings').onclick=function(){show('menu');};
   document.getElementById('back-game').onclick=stopGame;
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(running){if(!craftEl.hidden)closeCraft();else stopGame();}else if(me)show('menu');}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(running){if(!lootEl.hidden)closeLoot();else if(!bedEl.hidden)closeBedWin();else if(!codeEl.hidden)closeCode();else if(!craftEl.hidden)closeCraft();else stopGame();}else if(me)show('menu');}});
 })();
 </script>
 </body>
