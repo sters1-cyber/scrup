@@ -2172,7 +2172,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       if(!m||!m.t)return;
       info.last=Date.now();
       if(m.t==='bye'){kickConn(conn.peer,info);return;}
-      if(m.t==='ping')return;
+      if(m.t==='ping'){if(info.ok&&rem[conn.peer])rem[conn.peer].seen=performance.now();return;}
       if(m.t==='info'){conn.send(Object.assign({t:'info'},curSrv?srvInfo():{name:'Локальная комната',owner:me?me.disp:'',players:playersCount(),max:16,official:false}));return;}
       if(m.t==='hello'){
         var nick=String(m.nick||'').trim();
@@ -2367,7 +2367,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var id,r,now=performance.now(),k=Math.min(1,dt*12),st,da;
     for(id in rem){
       r=rem[id];
-      if(now-r.seen>6000){dropRemote(id);continue;}
+      if(now-r.seen>20000){dropRemote(id);continue;}
       if(!scene||!r.st)continue;
       st=r.st;
       if(r.goneAt&&st.dead===0&&now-r.goneAt>1500)r.goneAt=0;
@@ -2856,18 +2856,25 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     updHPt(dt);updSrvHud();flushEv();updBushHint(dt);updResp(dt);flushLoad();srvTimers(dt);
     var snap,id;
     netT+=dt;
-    if(net.role&&netT>=.1){
-      netT=0;
-      if(net.role==='client'){
-        if(net.hostConn&&net.hostConn.open&&net.joined)net.hostConn.send(Object.assign({t:'st'},myState()));
-      }else if(net.role==='host'&&net.roomId){
-        snap={};snap[net.roomId]=myState();
-        for(id in net.conns)if(net.conns[id].ok&&rem[id]&&rem[id].st)snap[id]=rem[id].st;
-        broadcast({t:'snap',p:snap});
-      }
-    }
+    if(net.role&&netT>=.1){netT=0;netPush();}
     updRemotes(dt);
   }
+  /* отправка состояния; вызывается и из игрового цикла, и из таймера (когда вкладка в фоне и requestAnimationFrame стоит) */
+  var netLastPush=0;
+  function netPush(){
+    var snap,id;
+    netLastPush=performance.now();
+    if(net.role==='client'){
+      if(net.hostConn&&net.hostConn.open&&net.joined)net.hostConn.send(Object.assign({t:'st'},myState()));
+    }else if(net.role==='host'&&net.roomId){
+      snap={};snap[net.roomId]=myState();
+      for(id in net.conns)if(net.conns[id].ok&&rem[id]&&rem[id].st)snap[id]=rem[id].st;
+      broadcast({t:'snap',p:snap});
+    }
+  }
+  setInterval(function(){
+    if(net.role&&performance.now()-netLastPush>400){try{netPush();}catch(e){}}
+  },500);
   document.getElementById('open-mp').onclick=function(){show('mp');};
   document.getElementById('mp-back').onclick=function(){show('menu');};
   document.getElementById('mp-create').onclick=createServer;
