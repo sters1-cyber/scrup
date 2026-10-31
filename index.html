@@ -216,6 +216,17 @@ input[type=range]{width:150px;accent-color:var(--accent)}
 #dmgfx{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .4s;box-shadow:inset 0 0 130px 35px rgba(190,30,20,.8);z-index:19}
 #dmgfx.on{opacity:1;transition:none}
 #bsel{bottom:calc(env(safe-area-inset-bottom,0px) + 140px)}
+#deathscr{position:absolute;inset:0;z-index:40;background:rgba(36,6,4,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;color:#f1e9dc}
+#deathscr[hidden]{display:none}
+#deathscr h2{margin:0;color:#d9533a;text-align:center}
+#ds-by{text-align:center;font-size:1.05rem;line-height:1.5}
+#ds-by b{color:#fff}
+#ds-map{position:relative;width:min(56vh,84vw);height:min(56vh,84vw)}
+#ds-cv{width:100%;height:100%;display:block;border:2px solid rgba(255,255,255,.3);border-radius:6px;background:#123}
+#ds-dot{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#d9331f;border:2px solid #fff;box-shadow:0 0 0 0 rgba(217,51,31,.8);animation:dspulse 1.4s infinite}
+@keyframes dspulse{to{box-shadow:0 0 0 22px rgba(217,51,31,0)}}
+#ds-cap{font-size:.85rem;color:#c9bfae}
+#ds-resp{width:min(300px,80vw)}
 </style>
 </head>
 <body>
@@ -338,6 +349,12 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   <div id="hotbar"></div>
   <div id="hpwrap"><div id="hpbar"><div id="hpfill"></div><div id="hptxt">100</div></div></div>
   <div id="dmgfx"></div>
+  <div id="deathscr" hidden>
+    <div><h2>Вы погибли</h2><div id="ds-by"></div></div>
+    <div id="ds-map"><canvas id="ds-cv" width="450" height="450"></canvas><div id="ds-dot"></div></div>
+    <div id="ds-cap">Красная точка — место смерти</div>
+    <button class="btn primary" id="ds-resp">Возродиться</button>
+  </div>
   <div id="bsel" hidden></div>
   <button class="tbtn" id="bbtn" hidden>Строить</button>
   <div id="furn" hidden>
@@ -756,7 +773,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     for(i=0;i<trees.length;i++){if(trees[i].type==='cloth')continue;to.push(trees[i].g);if(trees[i].cross)co.push(trees[i].cross);}
     var hc=ray.intersectObjects(co,true),ht=ray.intersectObjects(to,true),tree,crit=false,o;
     var hpl=rayPlayer();
-    if(hpl&&(!ht.length||hpl.dist<ht[0].distance)&&(!hc.length||hpl.dist<hc[0].distance)){dealPlayer(hpl.id,meleeDmg());updHud();return;}
+    if(hpl&&(!ht.length||hpl.dist<ht[0].distance)&&(!hc.length||hpl.dist<hc[0].distance)){dealPlayer(hpl.id,meleeDmg(),curItem()||'Кулак');updHud();return;}
     if(hc.length){o=hc[0].object;while(o&&!o.userData.cross)o=o.parent;tree=o.userData.cross;crit=true;}
     else{
       var ao=[],ha;
@@ -781,7 +798,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     updHud();
   }
   function toggleInv(){
-    if(!running)return;
+    if(!running||plDead)return;
     if(!craftEl.hidden){craftEl.hidden=true;invOpen=false;invEl.hidden=true;return;}
     if(!furnEl.hidden){closeFurn();return;}
     if(!giveEl.hidden){toggleGive();return;}
@@ -928,7 +945,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       dx=P.x-an.x;dz=P.z-an.z;dp=Math.hypot(dx,dz);
       if(dp>260){scene.remove(an.g);animals.splice(i,1);respawn.push({t:.05,k:an.kind});continue;}
       if(an.hurt>0)an.hurt-=dt;
-      if((an.a.flee&&dp<14)||an.fear>0){an.dir=Math.atan2(-dx,-dz);spd=an.a.run;an.fear=Math.max(0,an.fear-dt);}
+      if(!an.a.flee&&!plDead&&(dp<10||an.fear>0)){
+        an.dir=Math.atan2(dx,dz);spd=an.a.run;an.fear=Math.max(0,an.fear-dt);an.atk=(an.atk||0)-dt;
+        if(dp<1.9&&an.atk<=0){an.atk=1.2;hurtMe(Math.round(12*({easy:.6,normal:1,hard:1.5}[settings.difficulty]||1)),an.a.n,'Укус');}
+      }
+      else if((an.a.flee&&dp<14)||an.fear>0){an.dir=Math.atan2(-dx,-dz);spd=an.a.run;an.fear=Math.max(0,an.fear-dt);}
       else{an.tmr-=dt;if(an.tmr<=0){an.state=Math.random()<.5?1:0;an.tmr=2+Math.random()*4;an.dir+=(Math.random()-.5)*2.4;}spd=an.state?an.a.sp:0;}
       ax=an.x+Math.sin(an.dir)*spd*dt;az=an.z+Math.cos(an.dir)*spd*dt;
       if(hAt(ax,az)<.3||depthAt(ax,az)>0||ax<-BX||ax>BX||az>BZ||az<14){an.dir+=2.2;ax=an.x;az=an.z;}
@@ -1318,7 +1339,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(hb)dist=hb.distance;
     var hpp=rayPlayer(),blk=hb?hb.distance:1e9;
     if(ha&&(!hb||ha.distance<hb.distance)&&(!hpp||ha.distance<hpp.dist)){hitAnimal(ha.object,25);dist=ha.distance;}
-    else if(hpp&&hpp.dist<blk){dealPlayer(hpp.id,PVP_GUN);dist=hpp.dist;}
+    else if(hpp&&hpp.dist<blk){dealPlayer(hpp.id,PVP_GUN,'Калаш');dist=hpp.dist;}
     tracer(dist);renderSlots();
   }
   function dropSprite(it){
@@ -1342,6 +1363,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function pickupDrop(){
     if(!running||invOpen)return;
+    if(lootCorpse())return;
     var i,d,best=null,bd=2.6,k,st;
     for(i=0;i<drops.length;i++){d=drops[i];k=Math.hypot(d.x-P.x,d.z-P.z);if(k<bd){bd=k;best=i;}}
     if(best===null)return;
@@ -1380,7 +1402,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
         }
         if(gone)break;
         var apid=arrowHitPlayer(p);
-        if(apid){dealPlayer(apid,Math.round(a.dmg*PVP_ARROW));gone=true;break;}
+        if(apid){dealPlayer(apid,Math.round(a.dmg*PVP_ARROW),'Лук');gone=true;break;}
         for(k=0;k<trees.length;k++){tq=trees[k];if(Math.hypot(p.x-tq.x,p.z-tq.z)<tq.r+.05&&p.y<tq.gh+(tq.type==='tree'?7*tq.s:1.6*tq.s)){a.stuck=true;a.t=0;break;}}
         if(a.stuck)break;
         for(k=0;k<colliders.length;k++){b2=colliders[k];if(p.x>b2.x0&&p.x<b2.x1&&p.z>b2.z0&&p.z<b2.z1&&p.y>b2.y0&&p.y<b2.y1){a.stuck=true;a.t=0;break;}}
@@ -2165,7 +2187,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function netOn(type,fn){net.h[type]=fn;}
   window.scrupNet={send:netSend,on:netOn};
   function myState(){
-    return {n:me?me.disp:'',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+yaw.toFixed(3),pitch:+pitch.toFixed(3),it:curItem(),hp:Math.round(plHP)};
+    return {n:me?me.disp:'',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+yaw.toFixed(3),pitch:+pitch.toFixed(3),it:curItem(),hp:Math.round(plHP),dead:plDead?1:0};
   }
   function labelSprite(name){
     var c=document.createElement('canvas'),g,w,sp;
@@ -2233,6 +2255,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       da=st.yaw+Math.PI-r.av.g.rotation.y;da=Math.atan2(Math.sin(da),Math.cos(da));r.av.g.rotation.y+=da*k;
       r.av.head.rotation.x=-st.pitch;
       if(st.hp!=null&&r.av.hpv!==st.hp)setAvHp(r.av,st.hp);
+      r.av.g.visible=!st.dead;
       if(r.av.heldName!==st.it){
         if(r.av.held){r.av.mount.remove(r.av.held);r.av.held=null;}
         r.av.heldName=st.it;r.av.held=makeHeld(st.it);
@@ -2248,8 +2271,9 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(t===lastHud)return;lastHud=t;e.textContent=t;e.hidden=!t;
   }
 
-  /* ---------- здоровье и PvP ---------- */
-  var plHP=100,plMax=100,plLast=0,plSafe=0,plShown=-1;
+  /* ---------- здоровье, PvP, смерть, трупы ---------- */
+  var plHP=100,plMax=100,plLast=0,plSafe=0,plShown=-1,plDead=false,deathX=0,deathZ=0,deathBy=null;
+  var corpses=[],corpNear=null;
   var PVP={'Булыжник':10,'Каменная кирка':20,'Каменный топор':30,'Копьё':40},PVP_HAND=5,PVP_GUN=22,PVP_ARROW=.8;
   function meleeDmg(){return PVP[curItem()]||PVP_HAND;}
   function updHP(){
@@ -2262,36 +2286,68 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function updHPt(dt){
     if(plSafe>0)plSafe-=dt;
-    if(plHP<plMax&&plHP>0&&performance.now()-plLast>8000){plHP=Math.min(plMax,plHP+2*dt);}
-    updHP();
+    if(plHP<plMax&&plHP>0&&!plDead&&performance.now()-plLast>8000)plHP=Math.min(plMax,plHP+2*dt);
+    updHP();updCorpses(dt);
   }
-  function hurtMe(d,from){
-    if(!running||plSafe>0||!(d>0))return;
+  function hurtMe(d,from,w){
+    if(!running||plDead||plSafe>0||!(d>0))return;
     plHP-=d;plLast=performance.now();
     var fx=document.getElementById('dmgfx');
     if(fx){fx.classList.add('on');setTimeout(function(){fx.classList.remove('on');},90);}
-    sfx(110,.15);say((from||'Игрок')+' ударил: −'+d);
-    if(plHP<=0)dieMe(from);
+    sfx(110,.15);say((from||'Игрок')+': −'+d);
+    if(plHP<=0){plHP=0;dieMe(from,w);}
     updHP();
   }
-  function dieMe(from){
-    netSend('kill',{k:from||'?',v:me?me.disp:'?'});
-    plHP=plMax;plSafe=3;plLast=performance.now();
-    P.x=0;P.z=30;P.y=P.by=hAt(0,30)+1.7;P.fy=undefined;jy=0;jvy=0;yaw=0;pitch=-.05;
-    say('Вас убил '+(from||'игрок')+'. Возрождение…');
+  function dieMe(from,w){
+    var items=[],nick=me?me.disp:'Игрок',uid=newFid(),i;
+    hot.concat(inv).forEach(function(x){if(x)items.push({n:x.n,i:x.i,c:x.c});});
+    deathX=P.x;deathZ=P.z;deathBy={by:from||'?',w:w||'—'};
+    createCorpse(nick,P.x,P.z,yaw,items,uid);
+    netEvent({t:'corpse',uid:uid,nick:nick,x:P.x,z:P.z,yw:yaw,items:items});
+    netSend('kill',{k:deathBy.by,v:nick,w:deathBy.w});
+    inv=new Array(40).fill(null);hot=[null,null,null,null,null,null];sel=0;
+    saveInv();renderSlots();
+    plDead=true;firing=false;draw=false;
+    showDeath();
   }
-  netOn('dmg',function(m){if(m&&m.to===net.myId)hurtMe(+m.d,m.from);});
-  netOn('kill',function(m){if(m)say(m.k+' убил '+m.v);});
-  function dealPlayer(id,d){
+  function showDeath(){
+    var el=document.getElementById('deathscr'),by=document.getElementById('ds-by'),c=document.getElementById('ds-cv'),g=c.getContext('2d'),dot=document.getElementById('ds-dot'),b1,b2;
+    if(!craftEl.hidden)craftEl.hidden=true;
+    if(!furnEl.hidden)closeFurn();
+    if(consEl&&!consEl.hidden)closeCons();
+    invEl.hidden=true;giveEl.hidden=true;
+    invOpen=true;if(document.pointerLockElement)document.exitPointerLock();
+    by.textContent='';
+    b1=document.createElement('b');b1.textContent=(deathBy&&deathBy.by)||'?';
+    b2=document.createElement('b');b2.textContent=(deathBy&&deathBy.w)||'—';
+    by.appendChild(document.createTextNode('Вас убил: '));by.appendChild(b1);
+    by.appendChild(document.createElement('br'));
+    by.appendChild(document.createTextNode('Чем: '));by.appendChild(b2);
+    g.imageSmoothingEnabled=false;
+    if(mmBase)g.drawImage(mmBase,0,0,c.width,c.height);else{g.fillStyle='#2f6f8a';g.fillRect(0,0,c.width,c.height);}
+    dot.style.left=clamp((deathX+750)/1500*100,0,100)+'%';
+    dot.style.top=clamp((1440-deathZ)/1500*100,0,100)+'%';
+    el.hidden=false;
+  }
+  document.getElementById('ds-resp').onclick=function(){
+    plDead=false;plHP=plMax;plSafe=3;plLast=performance.now();plShown=-1;
+    hot[0]={n:'Булыжник',i:'🌑',c:1};sel=0;
+    P.x=0;P.z=30;P.y=P.by=hAt(0,30)+1.7;P.fy=undefined;jy=0;jvy=0;yaw=0;pitch=-.05;
+    document.getElementById('deathscr').hidden=true;invOpen=false;
+    renderSlots();updHP();saveInv();say('Вы возродились');
+  };
+  netOn('dmg',function(m){if(m&&m.to===net.myId)hurtMe(+m.d,m.from,m.w);});
+  netOn('kill',function(m){if(m)say(m.k+' убил '+m.v+(m.w&&m.w!=='—'?' ('+m.w+')':''));});
+  function dealPlayer(id,d,w){
     var r=rem[id];if(!r||!net.role||(net.role==='client'&&!net.joined))return;
-    netSend('dmg',{to:id,d:d,from:me?me.disp:'Игрок'});
+    netSend('dmg',{to:id,d:d,from:me?me.disp:'Игрок',w:w||'Кулак'});
     if(r.st&&r.st.hp!=null)r.st.hp=Math.max(0,r.st.hp-d);
     say((r.st&&r.st.n||'Игрок')+': −'+d);sfx(200,.08);
   }
   function rayPlayer(){
     var id,r,best=null,hs,i;
     for(id in rem){
-      r=rem[id];if(!r.av)continue;
+      r=rem[id];if(!r.av||!r.av.g.visible)continue;
       hs=ray.intersectObjects(r.av.g.children,true);
       for(i=0;i<hs.length;i++){
         if(hs[i].object.isSprite)continue;
@@ -2304,7 +2360,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function arrowHitPlayer(p){
     var id,r,g;
     for(id in rem){
-      r=rem[id];if(!r.av)continue;g=r.av.g.position;
+      r=rem[id];if(!r.av||!r.av.g.visible)continue;g=r.av.g.position;
       if(Math.hypot(p.x-g.x,p.z-g.z)<.45&&p.y>g.y&&p.y<g.y+1.9)return id;
     }
     return null;
@@ -2316,6 +2372,48 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     c.fillStyle=v>60?'#4f9a43':(v>30?'#d3a62b':'#c0392b');
     c.fillRect(2,2,Math.max(0,w*v/plMax),12);
     av.hpS.material.map.needsUpdate=true;
+  }
+  /* ---------- трупы ---------- */
+  function findCorpse(uid){var i;for(i=0;i<corpses.length;i++)if(corpses[i].uid===uid)return corpses[i];return null;}
+  function createCorpse(nick,x,z,yw,items,uid){
+    var av=makeAvatar(nick),holder=new THREE.Group(),k,ch,lb;
+    for(k=av.g.children.length-1;k>=0;k--){ch=av.g.children[k];if(ch.isSprite)av.g.remove(ch);}
+    holder.add(av.g);
+    lb=labelSprite('☠ '+nick);lb.position.set(0,.9,0);holder.add(lb);
+    holder.rotation.y=(yw||0)+Math.PI;
+    holder.position.set(x,groundAt(x,z),z);
+    scene.add(holder);
+    corpses.push({g:holder,av:av.g,x:x,z:z,items:items||[],uid:uid,nick:nick,f:0,life:300});
+  }
+  function removeCorpse(c){var i=corpses.indexOf(c);scene.remove(c.g);if(i>=0)corpses.splice(i,1);if(corpNear===c)corpNear=null;}
+  function updCorpses(dt){
+    var i,c,e,near=null,nd=2.6,d;
+    if(!scene)return;
+    for(i=corpses.length-1;i>=0;i--){
+      c=corpses[i];
+      if(c.f<1){c.f=Math.min(1,c.f+dt/.7);e=c.f*c.f*(3-2*c.f);c.av.rotation.x=-e*Math.PI/2;c.av.position.y=.14*e;}
+      c.life-=dt;if(c.life<=0){removeCorpse(c);continue;}
+      d=Math.hypot(c.x-P.x,c.z-P.z);
+      if(d<nd&&c.items.length&&!plDead){nd=d;near=c;}
+    }
+    if(near!==corpNear){corpNear=near;if(near)say('E — обыскать труп: '+near.nick);}
+  }
+  function lootCorpse(){
+    var i,c,best=null,bd=2.6,d,it,before,left=[],got=0,st;
+    for(i=0;i<corpses.length;i++){c=corpses[i];d=Math.hypot(c.x-P.x,c.z-P.z);if(d<bd&&c.items.length){bd=d;best=c;}}
+    if(!best)return false;
+    for(i=0;i<best.items.length;i++){
+      it=best.items[i];st=!!(ITEMS[it.n]&&ITEMS[it.n].s)||it.c>1;
+      before=count(it.n);
+      addItem(it.n,it.i,it.c,st);
+      if(count(it.n)-before>=it.c)got++;else left.push(it);
+    }
+    renderSlots();sfx(420,.1);
+    best.items=left;
+    if(!left.length){say('Вы обыскали труп: '+best.nick);netEvent({t:'cloot',uid:best.uid});removeCorpse(best);}
+    else{say('Не хватило места в инвентаре');netEvent({t:'cupd',uid:best.uid,items:left});}
+    corpNear=null;
+    return true;
   }
   function updateNet(dt){
     updHPt(dt);updSrvHud();flushEv();updBushHint(dt);updResp(dt);flushLoad();srvTimers(dt);
@@ -2364,6 +2462,8 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function logDel(pred){var i;for(i=wlog.length-1;i>=0;i--)if(pred(wlog[i]))wlog.splice(i,1);}
   function logEv(e){
     if(net.role!=='host')return;
+    if(e.t==='cloot'){logDel(function(x){return (x.t==='corpse'||x.t==='cupd')&&x.uid===e.uid;});return;}
+    if(e.t==='cupd')logDel(function(x){return x.t==='cupd'&&x.uid===e.uid;});
     if(e.t==='pick'){logDel(function(x){return x.t==='drop'&&x.uid===e.uid;});return;}
     if(e.t==='sat')return;
     if(e.t==='resp'){logDel(function(x){return x.t==='dead'&&x.id===e.id;});return;}
@@ -2408,6 +2508,9 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       case 'resp':respawnNode(nodeById[e.id]);break;
       case 'drop':applyDrop(e);break;
       case 'pick':applyPick(e);break;
+      case 'corpse':if(!findCorpse(e.uid))createCorpse(e.nick,e.x,e.z,e.yw,e.items||[],e.uid);break;
+      case 'cupd':var cq=findCorpse(e.uid);if(cq)cq.items=e.items||[];break;
+      case 'cloot':var cr2=findCorpse(e.uid);if(cr2)removeCorpse(cr2);break;
       case 'sat':spawnSatchel(new THREE.Vector3(e.x,e.y,e.z));break;
     }
   }
@@ -2822,6 +2925,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     resize();
     P.x=0;P.z=30;P.bob=0;yaw=0;pitch=-.05;keys={};mv=lk=null;P.y=P.by=hAt(0,30)+1.7;jy=0;jvy=0;invOpen=false;invEl.hidden=true;updHud();giveEl.hidden=true;startAudio();
     clock=new THREE.Clock();running=true;cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
+    if(plDead)showDeath();
   }
   function stopGame(){
     saveSrv();saveInv();
@@ -2831,7 +2935,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   window.addEventListener('resize',function(){if(running&&R)resize();});
   window.addEventListener('keydown',function(e){
-    if(!running)return;
+    if(!running||plDead)return;
     if(e.key==='`'||e.key==='~'||e.key==='ё'||e.key==='Ё'){e.preventDefault();if(!e.repeat&&consEl.hidden)openCons();return;}
     if(e.key==='F1'){e.preventDefault();if(!e.repeat)toggleGive();return;}
     if((e.key==='e'||e.key==='у')&&!e.repeat){if(!furnEl.hidden)closeFurn();else if(!tryUse()&&!tryCollect())pickupDrop();return;}
