@@ -1045,7 +1045,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       windG.gain.value=musicVol*.18*(.6+.4*Math.sin(t*.37+1));
     }
   }
-  var S=3,ghost=null,ghostKey='',gmat,ray2,bsel=null,bmOpen=false,bmx=0,bmy=0,bmHover=null,tabT=0,colliders=[],found=[],occ={},pmat={},pick=[],curInfo=null,curParts=null,curOK=false;
+  var BREACH=6,BREACH_UP=4.8,placeWhy='',S=3,ghost=null,ghostKey='',gmat,ray2,bsel=null,bmOpen=false,bmx=0,bmy=0,bmHover=null,tabT=0,colliders=[],found=[],occ={},pmat={},pick=[],curInfo=null,curParts=null,curOK=false;
   var BN={F:'Фундамент',W:'Стена',D:'Дверной проем',R:'Крыша'};
   function curItem(){return hot[sel]?hot[sel].n:'';}
   function tmax(x0,z0,x1,z1){var m=-99,a,b;for(a=0;a<=3;a++)for(b=0;b<=3;b++)m=Math.max(m,hAt(x0+(x1-x0)*a/3,z0+(z1-z0)*b/3));return m;}
@@ -1143,8 +1143,20 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     return {x:gp.x,z:gp.z,rec:null};
   }
   function validPlace(inf,parts){
+    placeWhy='';
     if(occ[inf.key]||inf.ok===false)return false;
-    var i=inf.i,j=inf.j,land=1,q,p,cx,cz,feet=P.y-1.7;
+    var i=inf.i,j=inf.j,land=1,q,p,cx,cz,feet=P.y-1.7,dm=1e9,rel,lim;
+    if(inf.k!=='R'&&inf.k!=='F'&&inf.l>2){placeWhy='Максимум 3 стены в высоту';return false;}
+    if(inf.k==='R'&&inf.l>3){placeWhy='Выше 3 стен крышу ставить нельзя';return false;}
+    for(q=0;q<parts.length;q++){
+      p=parts[q];
+      cx=clamp(P.x,p.x-p.sx/2,p.x+p.sx/2);cz=clamp(P.z,p.z-p.sz/2,p.z+p.sz/2);
+      dm=Math.min(dm,Math.hypot(P.x-cx,P.z-cz));
+    }
+    if(dm>BREACH){placeWhy='Слишком далеко';return false;}
+    rel=(inf.k==='R'?inf.top-.25:(inf.k==='F'?inf.top:inf.base))-feet;
+    lim=inf.k==='R'?BREACH_UP+2.8:BREACH_UP;
+    if(rel>lim){placeWhy=(rel-lim<1.3?'Слишком высоко — подпрыгните':'Слишком высоко');return false;}
     if(inf.l===0){
       if(inf.k==='F')land=tmax(i*S,j*S,(i+1)*S,(j+1)*S);
       else if(inf.k!=='R')land=inf.t==='z'?tmax(i*S,j*S,i*S,(j+1)*S):tmax(i*S,j*S,(i+1)*S,j*S);
@@ -1186,7 +1198,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     return rec;
   }
   function placePiece(){
-    if(!curOK||!curInfo){say('Сюда нельзя поставить');return;}
+    if(!curOK||!curInfo){say(placeWhy||'Сюда нельзя поставить');return;}
     var inf={k:curInfo.k,i:curInfo.i,j:curInfo.j,t:curInfo.t,l:curInfo.l,key:curInfo.key};
     buildPiece(inf);
     sfx(200,.12);say('Поставлено: '+BN[inf.k]);
@@ -3581,6 +3593,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   function stopGame(){
     closeLoot();closeBedWin();closeCode();saveSrv();saveInv();
+    if(net.role)endSession();
     running=false;cancelAnimationFrame(raf);invOpen=false;invEl.hidden=true;giveEl.hidden=true;stopAudio();bmOpen=false;document.getElementById('bm').hidden=true;if(ghost)ghost.visible=false;if(furnEl)closeFurn();if(consEl&&!consEl.hidden)closeCons();craftEl.hidden=true;
     if(document.exitPointerLock&&document.pointerLockElement)document.exitPointerLock();
     show('menu');
