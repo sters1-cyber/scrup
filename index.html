@@ -215,6 +215,10 @@ input[type=range]{width:150px;accent-color:var(--accent)}
 #hptxt{position:absolute;inset:0;text-align:center;font:600 .74rem/18px 'Rubik',system-ui,sans-serif;color:#fff;text-shadow:0 1px 2px #000}
 #dmgfx{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .4s;box-shadow:inset 0 0 130px 35px rgba(190,30,20,.8);z-index:19}
 #dmgfx.on{opacity:1;transition:none}
+#sleepscr{position:absolute;inset:0;z-index:18;pointer-events:none;background:rgba(0,0,12,.45);display:flex;align-items:center;justify-content:center;text-align:center;color:#f1e9dc;text-shadow:0 2px 8px #000;padding:16px}
+#sleepscr[hidden]{display:none}
+#sleepscr h2{margin:0 0 8px;font-size:34px}
+#sleepscr p{margin:0;opacity:.85}
 #bsel{bottom:calc(env(safe-area-inset-bottom,0px) + 140px)}
 #deathscr{position:absolute;inset:0;z-index:40;background:rgba(36,6,4,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;color:#f1e9dc}
 #deathscr[hidden]{display:none}
@@ -376,6 +380,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   <div id="hotbar"></div>
   <div id="hpwrap"><div id="hpbar"><div id="hpfill"></div><div id="hptxt">100</div></div></div>
   <div id="dmgfx"></div>
+  <div id="sleepscr" hidden><div><h2>Вы спите</h2><p>Нажмите любую клавишу (или коснитесь экрана), чтобы встать</p></div></div>
   <div id="lootwin" hidden>
     <div class="invbox">
       <h2 id="lw-title">Труп</h2>
@@ -646,7 +651,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(keys.w||keys['ц']||keys.arrowup)fz-=1;
     if(keys.s||keys['ы']||keys.arrowdown)fz+=1;
     if(mv){fx+=clamp((mv.x-mv.sx)/50,-1,1);fz+=clamp((mv.y-mv.sy)/50,-1,1);}
-    if(invOpen){fx=0;fz=0;}
+    if(invOpen||plSleep){fx=0;fz=0;}
     var l=Math.hypot(fx,fz);if(l>1){fx/=l;fz/=l;}
     if(flying){flyfx=fx;flyfz=fz;fx=0;fz=0;l=0;}
     var sp=depthAt(P.x,P.z)>.3?2.2:5,s=Math.sin(yaw),c=Math.cos(yaw);
@@ -661,7 +666,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var moving=l>.1;if(moving)P.bob+=dt*sp*1.6;
     var gnd=groundAt(P.x,P.z,P.y-1.7+.75);
     P.by+=(gnd+1.7-P.by)*Math.min(1,dt*10);
-    if(keys[' ']&&jy<=.001&&!invOpen&&!bmOpen)jvy=6.4;
+    if(keys[' ']&&jy<=.001&&!invOpen&&!bmOpen&&!plSleep)jvy=6.4;
     if(jvy!==0||jy>0){jvy-=18*dt;jy+=jvy*dt;if(jy<=0){jy=0;jvy=0;}}
     P.y=P.by+jy;
     if(flying){
@@ -671,7 +676,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       P.fy=Math.max((P.fy===undefined?P.y:P.fy)+(fwy*fmf+fvy)*fsp*dt,Math.max(groundAt(P.x,P.z),0)+1.2);
       P.y=P.by=P.fy;jy=0;jvy=0;
     }
-    cam.position.set(P.x,P.y+(moving?Math.sin(P.bob*2)*.04:0),P.z);
+    cam.position.set(P.x,P.y-(plSleep?1.2:0)+(moving?Math.sin(P.bob*2)*.04:0),P.z);
     cam.rotation.set(pitch,yaw,0);
     var sw=0;
     if(swingT>0){swingT-=dt;var kk=1-Math.max(swingT,0)/.4;sw=kk<.3?kk/.3:(kk<.5?1-(kk-.3)/.1:-1+(kk-.5)/.5);}
@@ -2126,7 +2131,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     document.getElementById('au-login').hidden=first;
   }
   /* ---------- P2P (PeerJS) ---------- */
-  var net={peer:null,role:null,conns:{},hostConn:null,hostId:null,roomId:null,myId:null,joined:false,tmo:0,h:{}},rem={},netT=0;
+  var net={peer:null,role:null,conns:{},hostConn:null,hostId:null,roomId:null,myId:null,joined:false,tmo:0,h:{}},rem={},netT=0,sleepers={},killed={},joinPend=null;
   function mpStatus(t,err){
     var e=document.getElementById('mp-status'),e2=document.getElementById('sv-status');
     e.textContent=t||'';e.style.color=err?'#d9684a':'';
@@ -2148,10 +2153,14 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function genCode(){var c='abcdefghjkmnpqrstuvwxyz23456789',s2='',i;for(i=0;i<6;i++)s2+=c[Math.floor(Math.random()*c.length)];return s2;}
   function dropRemote(id){var r=rem[id];if(r&&r.av&&scene){scene.remove(r.av.g);}delete rem[id];}
   function closeNet(){
+    var oldPeer=net.peer,late=false;
+    if(net.role==='client'&&net.joined){sendBye();late=true;}
+    if(net.role==='host')hostLeaveBody();
     if(net.role==='host'&&curSrv){saveSrv();dirUnreg(curSrv.id);}
     clearTimeout(net.tmo);
-    try{if(net.peer)net.peer.destroy();}catch(e){}
-    net.peer=null;net.role=null;net.conns={};net.hostConn=null;net.roomId=null;net.myId=null;net.joined=false;
+    if(late)setTimeout(function(){try{oldPeer.destroy();}catch(e){}},500);
+    else try{if(oldPeer)oldPeer.destroy();}catch(e){}
+    net.byeSent=false;net.peer=null;net.role=null;net.conns={};net.hostConn=null;net.roomId=null;net.myId=null;net.joined=false;
     Object.keys(rem).forEach(dropRemote);
     document.getElementById('mp-room').hidden=true;mpPlayers();
   }
@@ -2171,8 +2180,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     conn.on('data',function(m){
       if(!m||!m.t)return;
       info.last=Date.now();
-      if(m.t==='bye'){kickConn(conn.peer,info);return;}
-      if(m.t==='ping'){if(info.ok&&rem[conn.peer])rem[conn.peer].seen=performance.now();return;}
+      if(m.t==='bye'){
+        if(info.ok){if(m.items)info.items=cleanItems(m.items);if(m.st&&typeof m.st==='object'){m.st.n=info.disp;setRem(conn.peer,m.st);}}
+        kickConn(conn.peer,info);return;
+      }
+      if(m.t==='ping'){if(info.ok){if(rem[conn.peer])rem[conn.peer].seen=performance.now();if(m.items)info.items=cleanItems(m.items);}return;}
       if(m.t==='info'){conn.send(Object.assign({t:'info'},curSrv?srvInfo():{name:'Локальная комната',owner:me?me.disp:'',players:playersCount(),max:16,official:false}));return;}
       if(m.t==='hello'){
         var nick=String(m.nick||'').trim();
@@ -2181,11 +2193,16 @@ input[type=range]{width:150px;accent-color:var(--accent)}
         if(curSrv&&playersCount()>=curSrv.max){conn.send({t:'reject',reason:'Сервер заполнен'});setTimeout(function(){conn.close();},300);return;}
         if(nickTaken(nick)){conn.send({t:'reject',reason:'Ник «'+nick+'» уже занят на этом сервере'});setTimeout(function(){conn.close();},300);return;}
         info.nick=nick;info.disp=dispName(nick);info.ok=true;info.last=Date.now();net.conns[conn.peer]=info;
-        conn.send({t:'welcome',id:conn.peer,seed:worldSeed,host:me?me.disp:''});
+        var skey=nick.toLowerCase(),ssl=sleepers[skey]||null,sdd=killed[skey]||null;
+        info.claim=skey;
+        conn.send({t:'welcome',id:conn.peer,seed:worldSeed,host:me?me.disp:'',sl:ssl?{x:ssl.x,y:ssl.y,z:ssl.z,yaw:ssl.yaw,hp:ssl.hp}:null,dead:(!ssl&&sdd)?sdd:null});
         conn.send({t:'init',log:wlog});
         mpPlayers();say('Подключился: '+info.disp);
       }else if(!info.ok){return;}
-      else if(m.t==='st'){m.n=info.disp;setRem(conn.peer,m);}
+      else if(m.t==='st'){
+        m.n=info.disp;setRem(conn.peer,m);
+        if(info.claim){var ck=info.claim;info.claim=null;if(sleepers[ck]){delete sleepers[ck];dropRemote('z:'+ck);}delete killed[ck];}
+      }
       else if(net.h[m.t]){net.h[m.t](m,conn.peer);broadcast(m,conn.peer);}
     });
     conn.on('close',function(){kickConn(conn.peer,info);});
@@ -2196,6 +2213,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var cur=net.conns[pid];
     if(cur&&cur!==info&&info){/* уже заменён новым подключением */return;}
     if(cur){delete net.conns[pid];}
+    if(info&&info.ok&&!info.gone&&rem[pid])makeSleeper(info.nick,info.disp,rem[pid].st,info.items);
     dropRemote(pid);mpPlayers();
     try{if(info&&info.conn)info.conn.close();}catch(e){}
     if(info&&info.ok&&!info.gone){info.gone=true;say('Отключился: '+info.disp);if(net.role==='host'&&curSrv)dirBeat();}
@@ -2206,6 +2224,40 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     for(id in net.conns){c=net.conns[id];
       if(c.ok&&c.nick.toLowerCase()===k&&(now-(c.last||0)>5000||!c.conn.open))kickConn(id,c);}
   }
+  function cleanItems(a){
+    var out=[];
+    if(!Array.isArray(a))return out;
+    a.slice(0,60).forEach(function(x){if(x&&x.n)out.push({n:String(x.n).slice(0,40),i:String(x.i||'').slice(0,8),c:Math.max(1,Math.min(1e6,Math.round(+x.c||1)))});});
+    return out;
+  }
+  function myItems(){var o=[];hot.concat(inv).forEach(function(x){if(x)o.push({n:x.n,i:x.i,c:x.c});});return o;}
+  /* тело вышедшего игрока остаётся лежать на месте выхода */
+  function makeSleeper(nick,disp,st,items){
+    var k=String(nick).toLowerCase();
+    if(!st||st.dead||!isFinite(+st.x)||!isFinite(+st.z))return;
+    sleepers[k]={nick:nick,disp:disp,x:+st.x,y:isFinite(+st.y)?+st.y:0,z:+st.z,yaw:+st.yaw||0,hp:Math.max(1,Math.min(100,+st.hp||100)),items:items||[],t:Date.now()};
+    delete killed[k];
+  }
+  function sleepSt(sl){return {n:sl.disp,x:sl.x,y:sl.y,z:sl.z,yaw:sl.yaw,pitch:0,it:'',hp:Math.round(sl.hp),dead:0,sl:1};}
+  function hostLeaveBody(){
+    if(net.role==='host'&&me&&!plDead&&isFinite(P.x))
+      makeSleeper(me.nick,me.disp,{x:P.x,y:P.y,z:P.z,yaw:yaw,hp:plHP},myItems());
+  }
+  /* удар по спящему телу (обрабатывает только хост) */
+  function sleeperHurt(key,d,from,w){
+    var sl=sleepers[key],uid;
+    if(net.role!=='host'||!sl||!(d>0))return;
+    sl.hp-=d;
+    if(sl.hp<=0){
+      delete sleepers[key];dropRemote('z:'+key);
+      uid=newFid();
+      createCorpse(sl.disp,sl.x,sl.z,sl.yaw,sl.items||[],uid);
+      netEvent({t:'corpse',uid:uid,nick:sl.disp,x:sl.x,z:sl.z,yw:sl.yaw,items:sl.items||[]});
+      killed[key]={by:from||'?',w:w||'—',x:sl.x,z:sl.z};
+      netSend('kill',{k:from||'?',v:sl.disp,w:w||'—'});
+      say((from||'?')+' убил '+sl.disp+' (спал)');
+    }
+  }
   /* проверка живых соединений: если 12 с тишины — игрок ушёл */
   setInterval(function(){
     var id,c,now=Date.now();
@@ -2215,19 +2267,28 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   },2000);
   /* клиент шлёт ping независимо от requestAnimationFrame (работает и в фоновой вкладке) */
   setInterval(function(){
-    if(net.role==='client'&&net.hostConn&&net.hostConn.open&&net.joined){try{net.hostConn.send({t:'ping'});}catch(e){}}
+    if(net.role==='client'&&net.hostConn&&net.hostConn.open&&net.joined){
+      net._pc=(net._pc||0)+1;
+      try{net.hostConn.send(net._pc%5===1?{t:'ping',items:myItems()}:{t:'ping'});}catch(e){}
+    }
   },2000);
   /* при закрытии вкладки сразу сообщаем об уходе */
+  function sendBye(){
+    if(net.role==='client'&&net.hostConn&&net.hostConn.open&&net.joined&&!net.byeSent){
+      net.byeSent=true;
+      try{net.hostConn.send({t:'bye',items:myItems(),st:myState()});}catch(e){}
+    }
+  }
   function netLeave(){
     try{
-      if(net.role==='client'&&net.hostConn&&net.hostConn.open)net.hostConn.send({t:'bye'});
+      if(net.role==='client')sendBye();
       else if(net.role==='host'){
+        hostLeaveBody();
         if(curSrv){saveSrv();dirUnreg(curSrv.id);}
         broadcast({t:'hostbye'});
+        if(net.peer)net.peer.destroy();
       }
     }catch(e){}
-    try{if(net.hostConn)net.hostConn.close();}catch(e){}
-    try{if(net.peer)net.peer.destroy();}catch(e){}
   }
   window.addEventListener('pagehide',netLeave);
   window.addEventListener('beforeunload',netLeave);
@@ -2241,6 +2302,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
         if(R){lsSet('scrup-autojoin',JSON.stringify({id:net.hostId,seed:m.seed}));mpStatus('Перезагружаю страницу, чтобы построить мир хоста…');location.reload();return;}
         worldSeed=m.seed;
       }
+      joinPend=(m.sl||m.dead)?{sl:m.sl||null,dead:m.dead||null}:null;net.byeSent=false;
       net.joined=true;mpStatus('Подключено к '+(m.host||'серверу')+'. Загружаю мир…');
       if(/^scrup-(s|official)-/.test(net.hostId))setInvKey('scrup-inv-'+net.hostId+'-'+me.nick.toLowerCase());else invKey=null;
       startGame();return;
@@ -2255,7 +2317,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function createServer(fixedId){
     if(!window.Peer){mpStatus('PeerJS не загрузился. Проверь интернет и обнови страницу.',true);return;}
     if(!me)return;
-    closeNet();if(!fixedId)curSrv=null;mpStatus('Создаю сервер…');
+    closeNet();if(!fixedId){curSrv=null;sleepers={};killed={};}mpStatus('Создаю сервер…');
     var tries=0;
     function open(){
       var peer;
@@ -2309,7 +2371,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function netOn(type,fn){net.h[type]=fn;}
   window.scrupNet={send:netSend,on:netOn};
   function myState(){
-    return {n:me?me.disp:'',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+yaw.toFixed(3),pitch:+pitch.toFixed(3),it:curItem(),hp:Math.round(plHP),dead:plDead?1:0};
+    return {n:me?me.disp:'',x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),yaw:+yaw.toFixed(3),pitch:+pitch.toFixed(3),it:plSleep?'':curItem(),hp:Math.round(plHP),dead:plDead?1:0,sl:plSleep?1:0};
   }
   function labelSprite(name){
     var c=document.createElement('canvas'),g,w,sp;
@@ -2335,7 +2397,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var hc=document.createElement('canvas');hc.width=128;hc.height=16;
     var hs=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(hc),transparent:true,fog:false}));
     hs.scale.set(1.1,.14,1);hs.position.set(0,1.95,0);g.add(hs);
-    var av={g:g,head:head,mount:mount,held:null,heldName:null,hpS:hs,hpC:hc,hpv:-1};
+    var av={lbl:sp,g:g,head:head,mount:mount,held:null,heldName:null,hpS:hs,hpC:hc,hpv:-1};
     setAvHp(av,100);
     return av;
   }
@@ -2372,12 +2434,16 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       st=r.st;
       if(r.goneAt&&st.dead===0&&now-r.goneAt>1500)r.goneAt=0;
       if(st.dead||r.goneAt){if(r.av){scene.remove(r.av.g);r.av=null;}continue;}
-      if(!r.av){r.av=makeAvatar(st.n||'Игрок');scene.add(r.av.g);r.av.g.position.set(st.x,st.y-1.7,st.z);}
+      if(r.av&&r.av.slF!==!!st.sl){scene.remove(r.av.g);r.av=null;}
+      if(!r.av){
+        r.av=makeAvatar((st.n||'Игрок')+(st.sl?' (спит)':''));r.av.slF=!!st.sl;scene.add(r.av.g);r.av.g.position.set(st.x,st.y-1.7+(st.sl?.18:0),st.z);
+        if(st.sl){r.av.g.rotation.order='YXZ';r.av.g.rotation.x=-Math.PI/2;r.av.lbl.position.set(0,0,1.1);r.av.hpS.position.set(0,0,.95);}
+      }
       r.av.g.position.x+=(st.x-r.av.g.position.x)*k;
-      r.av.g.position.y+=(st.y-1.7-r.av.g.position.y)*k;
+      r.av.g.position.y+=(st.y-1.7+(st.sl?.18:0)-r.av.g.position.y)*k;
       r.av.g.position.z+=(st.z-r.av.g.position.z)*k;
       da=st.yaw+Math.PI-r.av.g.rotation.y;da=Math.atan2(Math.sin(da),Math.cos(da));r.av.g.rotation.y+=da*k;
-      r.av.head.rotation.x=-st.pitch;
+      r.av.head.rotation.x=st.sl?0:-st.pitch;
       if(st.hp!=null&&r.av.hpv!==st.hp)setAvHp(r.av,st.hp);
       r.av.g.visible=!st.dead;
       if(r.av.heldName!==st.it){
@@ -2391,12 +2457,12 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function updSrvHud(){
     var e=document.getElementById('srvid'),t='',n=0,id;
     if(net.role==='host'&&net.roomId){for(id in net.conns)if(net.conns[id].ok)n++;t='Сервер: '+net.roomId+' · игроков: '+(n+1)+' (нажми — скопировать ID)';}
-    else if(net.role==='client'&&net.joined)t='Подключён к '+net.hostId+' · игроков: '+(Object.keys(rem).length+1);
+    else if(net.role==='client'&&net.joined)t='Подключён к '+net.hostId+' · игроков: '+(Object.keys(rem).filter(function(k){return k.indexOf('z:')!==0;}).length+1);
     if(t===lastHud)return;lastHud=t;e.textContent=t;e.hidden=!t;
   }
 
   /* ---------- здоровье, PvP, смерть, трупы ---------- */
-  var plHP=100,plMax=100,plLast=0,plSafe=0,plShown=-1,plDead=false,deathX=0,deathZ=0,deathBy=null;
+  var plSleep=false,plHP=100,plMax=100,plLast=0,plSafe=0,plShown=-1,plDead=false,deathX=0,deathZ=0,deathBy=null;
   var corpses=[],corpNear=null;
   var PVP={'Булыжник':10,'Каменная кирка':20,'Каменный топор':30,'Копьё':40},PVP_HAND=5,PVP_GUN=22,PVP_ARROW=.8;
   function meleeDmg(){return PVP[curItem()]||PVP_HAND;}
@@ -2413,8 +2479,33 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(plHP<plMax&&plHP>0&&!plDead&&performance.now()-plLast>8000)plHP=Math.min(plMax,plHP+2*dt);
     updHP();updCorpses(dt);
   }
+  function sleepOn(){plSleep=true;var e=document.getElementById('sleepscr');if(e)e.hidden=false;}
+  function wakeUp(){
+    var e=document.getElementById('sleepscr');
+    if(e)e.hidden=true;
+    if(!plSleep)return;
+    plSleep=false;keys={};say('Вы проснулись');
+  }
+  window.addEventListener('keydown',function(e){if(plSleep&&running){e.stopImmediatePropagation();wakeUp();}},true);
+  ['pointerdown','mousedown','touchstart'].forEach(function(ev){
+    document.addEventListener(ev,function(e){if(plSleep&&running){e.stopPropagation();wakeUp();}},true);
+  });
+  function applyJoin(){
+    var jp=joinPend,j;
+    joinPend=null;
+    if(!jp)return;
+    if(jp.dead){
+      inv=new Array(40).fill(null);hot=[null,null,null,null,null,null];sel=0;saveInv();renderSlots();
+      plDead=true;plHP=0;plShown=-1;deathBy={by:String(jp.dead.by||'?'),w:String(jp.dead.w||'—')};deathX=+jp.dead.x||0;deathZ=+jp.dead.z||0;
+    }else if(jp.sl&&isFinite(+jp.sl.x)&&isFinite(+jp.sl.z)){
+      j=jp.sl;P.x=+j.x;P.z=+j.z;P.y=P.by=hAt(P.x,P.z)+1.7;P.fy=undefined;jy=0;jvy=0;
+      yaw=+j.yaw||0;pitch=-.15;plHP=clamp(+j.hp||plMax,1,plMax);plShown=-1;plLast=performance.now();
+      sleepOn();
+    }
+  }
   function hurtMe(d,from,w){
     if(!running||plDead||plSafe>0||!(d>0))return;
+    wakeUp();
     plHP-=d;plLast=performance.now();
     var fx=document.getElementById('dmgfx');
     if(fx){fx.classList.add('on');setTimeout(function(){fx.classList.remove('on');},90);}
@@ -2423,6 +2514,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     updHP();
   }
   function dieMe(from,w){
+    wakeUp();
     var items=[],nick=me?me.disp:'Игрок',uid=newFid(),i;
     hot.concat(inv).forEach(function(x){if(x)items.push({n:x.n,i:x.i,c:x.c});});
     deathX=P.x;deathZ=P.z;deathBy={by:from||'?',w:w||'—'};
@@ -2467,11 +2559,16 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     renderSlots();updHP();saveInv();say(bd?'Возрождение: '+bd.name:'Вы возродились');
   }
   document.getElementById('ds-resp').onclick=function(){doRespawn(null);};
-  netOn('dmg',function(m){if(m&&m.to===net.myId)hurtMe(+m.d,m.from,m.w);});
+  netOn('dmg',function(m){
+    if(!m)return;
+    if(typeof m.to==='string'&&m.to.indexOf('z:')===0){if(net.role==='host')sleeperHurt(m.to.slice(2),+m.d,String(m.from||'?'),String(m.w||'—'));return;}
+    if(m.to===net.myId)hurtMe(+m.d,m.from,m.w);
+  });
   netOn('kill',function(m){var kid;if(m)for(kid in rem)if(rem[kid].st&&rem[kid].st.n===m.v)rem[kid].goneAt=performance.now();if(m)say(m.k+' убил '+m.v+(m.w&&m.w!=='—'?' ('+m.w+')':''));});
   function dealPlayer(id,d,w){
     var r=rem[id];if(!r||!net.role||(net.role==='client'&&!net.joined))return;
-    netSend('dmg',{to:id,d:d,from:me?me.disp:'Игрок',w:w||'Кулак'});
+    if(String(id).indexOf('z:')===0&&net.role==='host')sleeperHurt(String(id).slice(2),d,me?me.disp:'Игрок',w||'Кулак');
+    else netSend('dmg',{to:id,d:d,from:me?me.disp:'Игрок',w:w||'Кулак'});
     if(r.st&&r.st.hp!=null)r.st.hp=Math.max(0,r.st.hp-d);
     say((r.st&&r.st.n||'Игрок')+': −'+d);sfx(200,.08);
   }
@@ -2869,6 +2966,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }else if(net.role==='host'&&net.roomId){
       snap={};snap[net.roomId]=myState();
       for(id in net.conns)if(net.conns[id].ok&&rem[id]&&rem[id].st)snap[id]=rem[id].st;
+      for(id in sleepers){snap['z:'+id]=sleepSt(sleepers[id]);setRem('z:'+id,snap['z:'+id]);}
       broadcast({t:'snap',p:snap});
     }
   }
@@ -3046,7 +3144,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function srvInfo(){return {id:curSrv.id,name:curSrv.name,owner:me?me.disp:'',players:playersCount(),max:curSrv.max,official:!!curSrv.official,created:curSrv.created};}
   function saveSrv(){
     if(!curSrv||net.role!=='host')return;
-    curSrv.wlog=wlog;
+    curSrv.wlog=wlog;curSrv.sleepers=sleepers;curSrv.killed=killed;
     curSrv.resp=respQ.map(function(q){return {id:q.r.id,t:Math.round(q.t)};});
     curSrv.savedAt=Date.now();
     lsSet(srvKey(curSrv.id),JSON.stringify(curSrv));
@@ -3086,6 +3184,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(R&&srv.seed!==worldSeed){lsSet('scrup-autohost',srv.id);mpStatus('Перезагружаю страницу, чтобы построить мир сервера…');location.reload();return;}
     closeNet();
     worldSeed=srv.seed;curSrv=srv;prepareLoad(srv);
+    sleepers=srv.sleepers||{};killed=srv.killed||{};
+    (function(){var k=me.nick.toLowerCase(),b=sleepers[k],d=killed[k];
+      if(b){joinPend={sl:{x:b.x,y:b.y,z:b.z,yaw:b.yaw,hp:b.hp}};delete sleepers[k];}
+      else if(d){joinPend={dead:d};delete killed[k];}
+      else joinPend=null;})();
     setInvKey('scrup-inv-'+srv.id+'-'+me.nick.toLowerCase());
     createServer(srv.id);
   }
@@ -3378,6 +3481,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     try{if(!R)build();}catch(e){alert('Браузер не поддерживает WebGL.');show('menu');return;}
     resize();
     P.x=0;P.z=30;P.bob=0;yaw=0;pitch=-.05;keys={};mv=lk=null;P.y=P.by=hAt(0,30)+1.7;jy=0;jvy=0;invOpen=false;invEl.hidden=true;updHud();giveEl.hidden=true;startAudio();
+    applyJoin();
     clock=new THREE.Clock();running=true;cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
     if(plDead)showDeath();
   }
