@@ -133,6 +133,33 @@ input[type=range]{width:150px;accent-color:var(--accent)}
 .frow6{grid-template-columns:repeat(6,1fr)!important}
 .fbig{width:min(96vw,560px);max-height:94vh;overflow-y:auto;padding-bottom:96px}
 #hotbar{z-index:20}
+#srv.screen.active{position:fixed;inset:0;max-width:none;padding:0;gap:0;flex-direction:row;align-items:stretch;justify-content:flex-start;background:#171a17}
+#sv-side{width:clamp(150px,24vw,230px);flex:none;background:rgba(0,0,0,.35);border-right:1px solid rgba(255,255,255,.08);padding:14px 10px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+#sv-side h2{margin:0 0 6px}
+.svtab{text-align:left;padding:14px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:var(--ink);font:500 1rem 'Rubik',system-ui,sans-serif;cursor:pointer}
+.svtab.on{background:rgba(150,62,35,.75);color:#fff;border-color:rgba(150,62,35,1)}
+.sv-grow{flex:1}
+#sv-main{flex:1;min-width:0;display:flex;flex-direction:column}
+#sv-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap}
+#sv-title{flex:1;font-weight:600;font-size:1.2rem;min-width:150px}
+#sv-head .btn{width:auto;padding:10px 14px;font-size:.95rem}
+#sv-fav-add{display:flex;gap:6px}
+#sv-fav-add input{padding:8px;border-radius:6px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--ink);width:160px;font:inherit}
+#sv-list{flex:1;overflow:auto;padding:10px 16px;display:flex;flex-direction:column;gap:8px}
+.svrow{display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px}
+.svstar{background:none;border:0;color:#e8b923;font-size:1.4rem;cursor:pointer;padding:0 4px}
+.svname{flex:1;min-width:0;display:flex;flex-direction:column}
+.svname strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.svname small{color:var(--muted);font-size:.8rem;word-break:break-all}
+.svpl{min-width:64px;text-align:center;color:var(--muted);font-size:.95rem}
+.svpl.on{color:#7fc06a}.svpl.off{color:#d9684a}
+.svrow .gbtn{padding:9px 14px}
+.svempty{color:var(--muted);padding:20px;text-align:center}
+#sv-status{padding:8px 16px;font-size:.9rem;color:var(--muted);min-height:1.4em}
+#sv-new{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
+#sv-new[hidden]{display:none}
+#sv-new .card{width:min(92vw,380px)}
+#sv-new select{background:#1a1d1b;color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px 10px;font:inherit}
 #craftwin{position:absolute;inset:0;z-index:22;display:flex;background:rgba(14,16,14,.97)}
 #craftwin[hidden]{display:none}
 #cw-cats{width:clamp(120px,22vw,210px);flex:none;background:rgba(0,0,0,.35);border-right:1px solid rgba(255,255,255,.08);padding:12px 8px;display:flex;flex-direction:column;gap:6px;overflow:auto}
@@ -198,8 +225,8 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   <p class="hint">Ник и пароль хранятся только в этом браузере.</p>
 </section>
 
-<section id="mp" class="screen" aria-label="Сервера">
-  <h2>Сервера</h2>
+<section id="mp" class="screen" aria-label="Локальные сервера">
+  <h2>Локальные сервера</h2>
   <div class="card mpcard">
     <button class="btn primary" id="mp-create">Создать сервер</button>
     <div id="mp-room" hidden>
@@ -218,11 +245,49 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   <button class="btn" id="mp-back">Назад</button>
 </section>
 
+<section id="srv" class="screen" aria-label="Сервера">
+  <aside id="sv-side">
+    <h2>Сервера</h2>
+    <button class="svtab on" data-tab="off">Официальные</button>
+    <button class="svtab" data-tab="pl">От игроков</button>
+    <button class="svtab" data-tab="fav">Избранное</button>
+    <button class="svtab" data-tab="my">Мои серверы</button>
+    <div class="sv-grow"></div>
+    <button class="btn" id="sv-back">Назад</button>
+  </aside>
+  <section id="sv-main">
+    <div id="sv-head">
+      <div id="sv-title">Официальные серверы</div>
+      <div id="sv-fav-add" hidden><input id="sv-id" placeholder="ID сервера" autocomplete="off" spellcheck="false"><button class="btn mini" id="sv-add">В избранное</button></div>
+      <button class="btn mini" id="sv-refresh">Обновить</button>
+      <button class="btn mini primary" id="sv-create">Создать сервер</button>
+    </div>
+    <div id="sv-list"></div>
+    <div id="sv-status"></div>
+  </section>
+  <div id="sv-new" hidden>
+    <div class="card mpcard">
+      <h2>Новый сервер</h2>
+      <input class="field" id="sn-name" placeholder="Название сервера" maxlength="32" autocomplete="off">
+      <label class="mp-lbl">Максимум игроков:
+        <select id="sn-max"><option>4</option><option>8</option><option selected>16</option><option>32</option></select>
+      </label>
+      <label class="mp-lbl" id="sn-off-wrap" hidden><input type="checkbox" id="sn-off"> Официальный сервер
+        <select id="sn-off-id"></select>
+      </label>
+      <div class="err" id="sn-err"></div>
+      <button class="btn primary" id="sn-ok">Создать и запустить</button>
+      <button class="btn" id="sn-cancel">Отмена</button>
+    </div>
+  </div>
+</section>
+
 <main id="menu" class="screen">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="rough" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".04" numOctaves="3" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="5"/></filter></svg>
   <h1>Скруп</h1>
   <div class="menucol">
-    <button class="btn" id="open-mp">Сервера</button>
+    <button class="btn" id="open-srv">Сервера</button>
+    <button class="btn" id="open-mp">Локальные сервера</button>
     <button class="btn" id="open-settings">Настройки</button>
     <button class="btn primary" id="play">Играть</button>
     <div class="ver">Версия бета 1.7</div>
@@ -1111,12 +1176,12 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     renderFurn();furnSync();
   }
   var camps=[];
-  function makeCamp(x,z){
+  function makeCamp(x,z,ry,fid){
     var g=new THREE.Group(),y=groundAt(x,z),lm=new THREE.MeshLambertMaterial({color:0x3e2b1a,flatShading:true}),sm=new THREE.MeshLambertMaterial({color:0x6a6c70,flatShading:true}),i,q;
     for(i=0;i<4;i++){q=new THREE.Mesh(new THREE.CylinderGeometry(.07,.08,.8,6),lm);q.rotation.order='YXZ';q.rotation.set(1.3,i*Math.PI/2,0);q.position.y=.1;g.add(q);}
     for(i=0;i<7;i++){q=new THREE.Mesh(new THREE.DodecahedronGeometry(.13,0),sm);q.position.set(Math.cos(i*.9)*.55,.08,Math.sin(i*.9)*.55);g.add(q);}
     var fl=new THREE.Mesh(new THREE.ConeGeometry(.22,.65,6),new THREE.MeshBasicMaterial({color:0xff7a2a,transparent:true,opacity:.9}));
-    fl.position.y=.4;g.add(fl);g.position.set(x,y,z);scene.add(g);camps.push({fl:fl});solids.push({x:x,z:z,r:.55});
+    fl.position.y=.4;g.add(fl);g.position.set(x,y,z);scene.add(g);var cr={fl:fl,fid:fid||newFid()};camps.push(cr);solids.push({x:x,z:z,r:.55});return cr;
   }
   var PL={'Печка':{s:1.1,r:.85,make:makeFurnace},'Костёр':{s:.9,r:.6,make:makeCamp}};
   function updateFur(dt,t){
@@ -1930,6 +1995,8 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     auErr('');document.getElementById('au-pass').value='';updWho();show('menu');afterLogin();
   }
   function afterLogin(){
+    var ah=lsGet('scrup-autohost'),sv0;
+    if(ah){lsSet('scrup-autohost','');sv0=loadSrvData(ah);if(sv0){startHost(sv0);return;}}
     var aj=lsGet('scrup-autojoin');
     if(!aj)return;
     lsSet('scrup-autojoin','');
@@ -1945,7 +2012,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   }
   /* ---------- P2P (PeerJS) ---------- */
   var net={peer:null,role:null,conns:{},hostConn:null,hostId:null,roomId:null,myId:null,joined:false,tmo:0,h:{}},rem={},netT=0;
-  function mpStatus(t,err){var e=document.getElementById('mp-status');e.textContent=t||'';e.style.color=err?'#d9684a':'';}
+  function mpStatus(t,err){
+    var e=document.getElementById('mp-status'),e2=document.getElementById('sv-status');
+    e.textContent=t||'';e.style.color=err?'#d9684a':'';
+    if(e2){e2.textContent=t||'';e2.style.color=err?'#d9684a':'';}
+  }
   function mpPlayers(){
     var names=[],id;
     if(net.role==='host'&&me)names.push(me.disp+' (хост)');
@@ -1962,6 +2033,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function genCode(){var c='abcdefghjkmnpqrstuvwxyz23456789',s2='',i;for(i=0;i<6;i++)s2+=c[Math.floor(Math.random()*c.length)];return s2;}
   function dropRemote(id){var r=rem[id];if(r&&r.av&&scene){scene.remove(r.av.g);}delete rem[id];}
   function closeNet(){
+    if(net.role==='host'&&curSrv){saveSrv();dirUnreg(curSrv.id);}
     clearTimeout(net.tmo);
     try{if(net.peer)net.peer.destroy();}catch(e){}
     net.peer=null;net.role=null;net.conns={};net.hostConn=null;net.roomId=null;net.myId=null;net.joined=false;
@@ -1983,9 +2055,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     var info={conn:conn,nick:'',disp:'',ok:false};
     conn.on('data',function(m){
       if(!m||!m.t)return;
+      if(m.t==='info'){conn.send(Object.assign({t:'info'},curSrv?srvInfo():{name:'Локальная комната',owner:me?me.disp:'',players:playersCount(),max:16,official:false}));return;}
       if(m.t==='hello'){
         var nick=String(m.nick||'').trim();
         if(!/^[A-Za-z0-9_\u0410-\u044f\u0401\u0451]{3,16}$/.test(nick)){conn.send({t:'reject',reason:'Некорректный ник'});setTimeout(function(){conn.close();},300);return;}
+        if(curSrv&&playersCount()>=curSrv.max){conn.send({t:'reject',reason:'Сервер заполнен'});setTimeout(function(){conn.close();},300);return;}
         if(nickTaken(nick)){conn.send({t:'reject',reason:'Ник «'+nick+'» уже занят на этом сервере'});setTimeout(function(){conn.close();},300);return;}
         info.nick=nick;info.disp=dispName(nick);info.ok=true;net.conns[conn.peer]=info;
         conn.send({t:'welcome',id:conn.peer,seed:worldSeed,host:me?me.disp:''});
@@ -2008,7 +2082,9 @@ input[type=range]{width:150px;accent-color:var(--accent)}
         if(R){lsSet('scrup-autojoin',JSON.stringify({id:net.hostId,seed:m.seed}));mpStatus('Перезагружаю страницу, чтобы построить мир хоста…');location.reload();return;}
         worldSeed=m.seed;
       }
-      net.joined=true;mpStatus('Подключено к '+(m.host||'серверу')+'. Загружаю мир…');startGame();return;
+      net.joined=true;mpStatus('Подключено к '+(m.host||'серверу')+'. Загружаю мир…');
+      if(/^scrup-(s|official)-/.test(net.hostId))setInvKey('scrup-inv-'+net.hostId+'-'+me.nick.toLowerCase());else invKey=null;
+      startGame();return;
     }
     if(m.t==='snap'){
       for(id in m.p)if(id!==net.myId)setRem(id,m.p[id]);
@@ -2017,22 +2093,23 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     }
     if(net.h[m.t])net.h[m.t](m);
   }
-  function createServer(){
+  function createServer(fixedId){
     if(!window.Peer){mpStatus('PeerJS не загрузился. Проверь интернет и обнови страницу.',true);return;}
     if(!me)return;
-    closeNet();mpStatus('Создаю сервер…');
+    closeNet();if(!fixedId)curSrv=null;mpStatus('Создаю сервер…');
     var tries=0;
     function open(){
       var peer;
-      try{peer=new Peer('scrup-'+genCode());}catch(e){mpStatus('Ошибка PeerJS: '+e.message,true);return;}
+      try{peer=new Peer(fixedId||('scrup-'+genCode()));}catch(e){mpStatus('Ошибка PeerJS: '+e.message,true);return;}
       net.peer=peer;net.role='host';
       peer.on('open',function(id){
         clearTimeout(net.tmo);net.roomId=id;net.myId=id;
         document.getElementById('mp-id').textContent=id;document.getElementById('mp-room').hidden=false;
-        mpStatus('Сервер запущен. ID: '+id);mpPlayers();setTimeout(startGame,50);
+        mpStatus('Сервер запущен. ID: '+id);mpPlayers();if(curSrv)dirBeat();setTimeout(startGame,50);
       });
       peer.on('connection',onHostConn);
       peer.on('error',function(e){
+        if(e.type==='unavailable-id'&&fixedId){mpStatus('Этот сервер уже запущен (ID занят). Закрой другие вкладки с игрой и попробуй снова.',true);return;}
         if(e.type==='unavailable-id'&&tries++<5){try{peer.destroy();}catch(x){}open();return;}
         mpErr(e);
       });
@@ -2046,7 +2123,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(!id){mpStatus('Введи ID сервера',true);return;}
     if(!window.Peer){mpStatus('PeerJS не загрузился. Проверь интернет и обнови страницу.',true);return;}
     if(!me)return;
-    closeNet();mpStatus('Подключаюсь…');
+    closeNet();curSrv=null;mpStatus('Подключаюсь…');
     var peer;
     try{peer=new Peer();}catch(e){mpStatus('Ошибка PeerJS: '+e.message,true);return;}
     net.peer=peer;net.role='client';net.hostId=id;
@@ -2150,7 +2227,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(t===lastHud)return;lastHud=t;e.textContent=t;e.hidden=!t;
   }
   function updateNet(dt){
-    updSrvHud();flushEv();updBushHint(dt);updResp(dt);
+    updSrvHud();flushEv();updBushHint(dt);updResp(dt);flushLoad();srvTimers(dt);
     var snap,id;
     netT+=dt;
     if(net.role&&netT>=.1){
@@ -2170,7 +2247,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   document.getElementById('mp-create').onclick=createServer;
   document.getElementById('mp-join').onclick=function(){joinServer(document.getElementById('mp-input').value);};
   document.getElementById('mp-enter').onclick=startGame;
-  document.getElementById('mp-disc').onclick=function(){closeNet();mpStatus('Отключено');};
+  document.getElementById('mp-disc').onclick=function(){endSession();mpStatus('Отключено');};
   document.getElementById('mp-copy').onclick=function(){
     var t=document.getElementById('mp-id').textContent;
     if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){mpStatus('ID скопирован');},function(){mpStatus('Скопируй вручную: '+t);});
@@ -2183,14 +2260,13 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       if(e.key==='Enter')authSubmit(accounts()[document.getElementById('au-nick').value.trim().toLowerCase()]?'login':'reg');
     });
   });
-  document.getElementById('logout').onclick=function(){closeNet();lsSet(SES_KEY,'');me=null;updWho();show('auth');};
+  document.getElementById('logout').onclick=function(){endSession();lsSet(SES_KEY,'');me=null;updWho();show('auth');};
   document.getElementById('srvid').onclick=function(){
     if(net.role==='host'&&net.roomId){
       if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(net.roomId).then(function(){say('ID скопирован');},function(){say(net.roomId);});
       else say(net.roomId);
     }
   };
-  bootAuth();
   /* ---------- синхронизация мира: событие -> хост -> все остальные ---------- */
   var evq=[],wlog=[],fSeq=0;
   function newFid(){return (net.myId||'loc')+'-'+(++fSeq);}
@@ -2234,7 +2310,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     if(!scene||!R){evq.push(e);return;}
     switch(e.t){
       case 'place':if(!occ[e.key])buildPiece({k:e.k,i:e.i,j:e.j,t:e.tt,l:e.l,key:e.key});break;
-      case 'furn':if(PL[e.name])PL[e.name].make(e.x,e.z,e.ry,e.fid);break;
+      case 'furn':if(PL[e.name]&&!(e.fid&&(furnaces.some(function(f){return f.fid===e.fid;})||camps.some(function(f){return f.fid===e.fid;}))))PL[e.name].make(e.x,e.z,e.ry,e.fid);break;
       case 'fact':applyFact(e);break;
       case 'fst':applyFst(e);break;
       case 'dead':applyDead(e.id);break;
@@ -2253,7 +2329,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   netOn('ev',function(m){logEv(m.e);applyEv(m.e);});
   netOn('init',function(m){(m.log||[]).forEach(applyEv);});
   var respQ=[];
-  function scheduleResp(r){if(!r.rs||net.role==='client')return;respQ.push({r:r,t:480});}
+  function scheduleResp(r){if(!r.rs||net.role==='client'||replaying)return;respQ.push({r:r,t:480});}
   function respawnNode(r){if(!r||!r.dead)return;r.dead=false;r.hp=r.hp0||1;r.shake=0;scene.add(r.g);trees.push(r);gAdd(r);}
   function updResp(dt){
     var i,q;
@@ -2311,6 +2387,290 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     spawnDropAt({n:'Бензин низкого качества',i:'⛽',c:n},r.x,r.z);
     sfx(240,.25);say('Бочка разбита: вытек бензин. E — подобрать');
   }
+  /* ---------- полноценные серверы: сохранение, список, избранное ---------- */
+  var curSrv=null,invKey=null,replaying=false,loadQ=null,saveT=0,dirT=0;
+  var OFFICIAL=[{id:'scrup-official-1',name:'Официальный сервер #1'},{id:'scrup-official-2',name:'Официальный сервер #2'}];
+  var FAV_KEY='scrup-favs',MY_KEY='scrup-myservers';
+  function srvKey(id){return 'scrup-srv-'+id;}
+  function loadSrvData(id){try{return JSON.parse(lsGet(srvKey(id))||'null');}catch(e){return null;}}
+  function myList(){try{return JSON.parse(lsGet(MY_KEY)||'[]')||[];}catch(e){return [];}}
+  function playersCount(){var n=1,id;for(id in net.conns)if(net.conns[id].ok)n++;return n;}
+  function srvInfo(){return {id:curSrv.id,name:curSrv.name,owner:me?me.disp:'',players:playersCount(),max:curSrv.max,official:!!curSrv.official,created:curSrv.created};}
+  function saveSrv(){
+    if(!curSrv||net.role!=='host')return;
+    curSrv.wlog=wlog;
+    curSrv.resp=respQ.map(function(q){return {id:q.r.id,t:Math.round(q.t)};});
+    curSrv.savedAt=Date.now();
+    lsSet(srvKey(curSrv.id),JSON.stringify(curSrv));
+  }
+  function setInvKey(k){
+    var d=null;
+    invKey=k;
+    if(!k)return;
+    try{d=JSON.parse(lsGet(k)||'null');}catch(e){}
+    if(d&&d.inv&&d.hot){inv=d.inv;hot=d.hot;sel=d.sel||0;}
+    else{inv=new Array(40).fill(null);hot=[{n:'Булыжник',i:'🌑',c:1},null,null,null,null,null];sel=0;}
+    renderSlots();
+  }
+  function saveInv(){if(invKey)lsSet(invKey,JSON.stringify({inv:inv,hot:hot,sel:sel}));}
+  function endSession(){closeNet();curSrv=null;invKey=null;}
+  function srvTimers(dt){
+    saveT+=dt;dirT+=dt;
+    if(saveT>20){saveT=0;saveSrv();saveInv();}
+    if(dirT>15){dirT=0;dirBeat();}
+  }
+  window.addEventListener('pagehide',function(){saveSrv();saveInv();});
+  function prepareLoad(srv){
+    var el=Math.max(0,(Date.now()-(srv.savedAt||Date.now()))/1000),exp={},pend=[],log=(srv.wlog||[]).slice();
+    (srv.resp||[]).forEach(function(q){var rm=q.t-el;if(rm<=0)exp[q.id]=1;else pend.push({id:q.id,t:rm});});
+    log=log.filter(function(e){return !(e.t==='dead'&&exp[e.id]);});
+    wlog=log;srv.wlog=log;loadQ={log:log.slice(),pend:pend};
+  }
+  function flushLoad(){
+    if(!loadQ||!scene||!R)return;
+    var q=loadQ;loadQ=null;replaying=true;
+    q.log.forEach(applyEv);replaying=false;
+    q.pend.forEach(function(p){var r=nodeById[p.id];if(r&&r.dead)respQ.push({r:r,t:p.t});});
+  }
+  function startHost(srv){
+    if(!me||!srv)return;
+    if(!window.Peer){mpStatus('PeerJS не загрузился. Проверь интернет и обнови страницу.',true);return;}
+    if(R&&srv.seed!==worldSeed){lsSet('scrup-autohost',srv.id);mpStatus('Перезагружаю страницу, чтобы построить мир сервера…');location.reload();return;}
+    closeNet();
+    worldSeed=srv.seed;curSrv=srv;prepareLoad(srv);
+    setInvKey('scrup-inv-'+srv.id+'-'+me.nick.toLowerCase());
+    createServer(srv.id);
+  }
+  /* ----- каталог серверов игроков без бэкенда: один из игроков держит «каталог», остальные регистрируются в нём ----- */
+  var DIR_ID='scrup-dir-v1',dir={p:null,state:'idle',owner:false,reg:{},conn:null,waiters:[],onList:null,retry:0};
+  function dirDone(ok){var w=dir.waiters;dir.waiters=[];if(!ok)dir.state='idle';w.forEach(function(f){f(ok);});}
+  function dirCurrent(){
+    var now=Date.now(),a=[],k;
+    for(k in dir.reg){if(now-dir.reg[k].seen>60000){delete dir.reg[k];continue;}a.push(dir.reg[k].s);}
+    return a;
+  }
+  function dirServe(c){
+    c.on('data',function(m){
+      var x;
+      if(!m||!m.t)return;
+      if(m.t==='reg'&&m.s&&m.s.id){
+        x=m.s;
+        dir.reg[String(x.id).slice(0,40)]={seen:Date.now(),s:{id:String(x.id).slice(0,40),name:String(x.name||'').slice(0,32),owner:String(x.owner||'').slice(0,24),players:+x.players||0,max:+x.max||0,created:+x.created||0}};
+      }else if(m.t==='unreg')delete dir.reg[m.id];
+      else if(m.t==='list')c.send({t:'list',list:dirCurrent()});
+    });
+    c.on('error',function(){});
+  }
+  function dirInit(done){
+    var p,tm;
+    if(dir.state==='owner'||(dir.state==='client'&&dir.conn&&dir.conn.open)){done(true);return;}
+    dir.waiters.push(done);
+    if(dir.state==='connecting')return;
+    if(!window.Peer){dirDone(false);return;}
+    dir.state='connecting';
+    try{p=new Peer(DIR_ID);}catch(e){dirDone(false);return;}
+    dir.p=p;
+    tm=setTimeout(function(){if(dir.state==='connecting'){try{p.destroy();}catch(e){}dirDone(false);}},9000);
+    p.on('open',function(){clearTimeout(tm);dir.state='owner';dir.owner=true;dirDone(true);});
+    p.on('connection',dirServe);
+    p.on('error',function(e){
+      clearTimeout(tm);
+      if(dir.state!=='connecting')return;
+      try{p.destroy();}catch(x){}
+      if(e.type==='unavailable-id')dirClient();else dirDone(false);
+    });
+  }
+  function dirClient(){
+    var p,tm;
+    try{p=new Peer();}catch(e){dirDone(false);return;}
+    dir.p=p;dir.owner=false;
+    tm=setTimeout(function(){if(dir.state==='connecting'){try{p.destroy();}catch(e){}dirDone(false);}},9000);
+    p.on('open',function(){
+      var c=p.connect(DIR_ID,{reliable:true,serialization:'json'});dir.conn=c;
+      c.on('open',function(){clearTimeout(tm);dir.state='client';dirDone(true);});
+      c.on('data',function(m){if(m&&m.t==='list'&&dir.onList){var f=dir.onList;dir.onList=null;f(m.list);}});
+      c.on('close',function(){dir.state='idle';dir.conn=null;});
+    });
+    p.on('error',function(e){
+      var w;
+      clearTimeout(tm);
+      if(dir.state!=='connecting')return;
+      try{p.destroy();}catch(x){}
+      if(e.type==='peer-unavailable'&&dir.retry++<1){w=dir.waiters;dir.waiters=[];dir.state='idle';w.forEach(dirInit);}
+      else dirDone(false);
+    });
+  }
+  function dirList(cb){
+    dirInit(function(ok){
+      if(!ok){cb(null);return;}
+      if(dir.owner){cb(dirCurrent());return;}
+      dir.onList=cb;dir.conn.send({t:'list'});
+      setTimeout(function(){if(dir.onList===cb){dir.onList=null;cb(null);}},6000);
+    });
+  }
+  function dirBeat(){
+    if(!curSrv||net.role!=='host'||curSrv.official)return;
+    dirInit(function(ok){
+      var s2;
+      if(!ok)return;
+      s2=srvInfo();
+      if(dir.owner)dir.reg[s2.id]={s:s2,seen:Date.now()};
+      else if(dir.conn&&dir.conn.open)dir.conn.send({t:'reg',s:s2});
+    });
+  }
+  function dirUnreg(id){
+    if(dir.owner)delete dir.reg[id];
+    else if(dir.conn&&dir.conn.open)dir.conn.send({t:'unreg',id:id});
+  }
+  /* ----- проверка, жив ли сервер, и его данные ----- */
+  var probeP=null,probeReady=false,probeWait=[],probePend={};
+  function probeInit(cb){
+    if(probeReady){cb(true);return;}
+    probeWait.push(cb);
+    if(probeP)return;
+    try{probeP=new Peer();}catch(e){probeWait.splice(0).forEach(function(f){f(false);});probeP=null;return;}
+    probeP.on('open',function(){probeReady=true;probeWait.splice(0).forEach(function(f){f(true);});});
+    probeP.on('error',function(e){
+      var m=/peer\s+(\S+)$/.exec(e.message||'');
+      if(e.type==='peer-unavailable'&&m&&probePend[m[1]]){probePend[m[1]](null);return;}
+      if(!probeReady){probeWait.splice(0).forEach(function(f){f(false);});try{probeP.destroy();}catch(x){}probeP=null;}
+    });
+    probeP.on('disconnected',function(){try{probeP.reconnect();}catch(e){}});
+  }
+  function probeServer(id,cb){
+    probeInit(function(ok){
+      var c,done=false,t;
+      if(!ok){cb(null);return;}
+      c=probeP.connect(id,{reliable:true,serialization:'json'});
+      function fin(v){if(done)return;done=true;clearTimeout(t);delete probePend[id];try{c.close();}catch(e){}cb(v);}
+      probePend[id]=fin;t=setTimeout(function(){fin(null);},7000);
+      c.on('open',function(){c.send({t:'info'});});
+      c.on('data',function(m){if(m&&m.t==='info')fin(m);});
+      c.on('error',function(){fin(null);});
+    });
+  }
+  /* ----- окно «Сервера» ----- */
+  var svTab='off',svList=[];
+  function favs(){try{return JSON.parse(lsGet(FAV_KEY)||'[]')||[];}catch(e){return [];}}
+  function isFav(id){return favs().some(function(f){return f.id===id;});}
+  function toggleFav(id,name){
+    var a=favs(),i=a.findIndex(function(f){return f.id===id;});
+    if(i>=0)a.splice(i,1);else a.push({id:id,name:name});
+    lsSet(FAV_KEY,JSON.stringify(a));
+    if(svTab==='fav')loadSv();else renderSv();
+  }
+  function svStatus(t,err){var e=document.getElementById('sv-status');e.textContent=t||'';e.style.color=err?'#d9684a':'';}
+  var SV_TITLES={off:'Официальные серверы',pl:'Серверы от игроков',fav:'Избранные серверы',my:'Мои серверы'};
+  function renderSv(){
+    var list=document.getElementById('sv-list'),em;
+    list.textContent='';
+    document.querySelectorAll('.svtab').forEach(function(b){b.classList.toggle('on',b.dataset.tab===svTab);});
+    document.getElementById('sv-title').textContent=SV_TITLES[svTab];
+    document.getElementById('sv-fav-add').hidden=svTab!=='fav';
+    if(!svList.length){
+      em=document.createElement('div');em.className='svempty';
+      em.textContent=svTab==='fav'?'Здесь пока пусто. Нажми ☆ у сервера или добавь его по ID.':svTab==='my'?'Ты ещё не создавал серверы. Нажми «Создать сервер».':'Список пуст.';
+      list.appendChild(em);return;
+    }
+    svList.forEach(function(s){
+      var d=document.createElement('div'),st=document.createElement('button'),nm=document.createElement('div'),pl=document.createElement('div'),act=document.createElement('button'),a,b,del;
+      d.className='svrow';
+      st.className='svstar';st.textContent=isFav(s.id)?'★':'☆';st.title='Избранное';
+      st.onclick=function(){toggleFav(s.id,s.name);};
+      nm.className='svname';a=document.createElement('strong');b=document.createElement('small');
+      a.textContent=(s.official?'★ ':'')+s.name;b.textContent=(s.owner?s.owner+' · ':'')+s.id;
+      nm.appendChild(a);nm.appendChild(b);
+      pl.className='svpl'+(s.online===true?' on':s.online===false?' off':'');
+      pl.textContent=s.online===false?'офлайн':(s.online===undefined?'…':(s.players||0)+'/'+(s.max||'?'));
+      act.className='gbtn';
+      if(s.my){
+        act.textContent=(net.role==='host'&&curSrv&&curSrv.id===s.id)?'Запущен':'Запустить';
+        act.onclick=function(){startHost(loadSrvData(s.id));};
+        del=document.createElement('button');del.className='gbtn';del.textContent='Удалить';
+        del.onclick=function(){
+          if(!confirm('Удалить сервер «'+s.name+'» вместе с миром?'))return;
+          lsSet(srvKey(s.id),'');lsSet(MY_KEY,JSON.stringify(myList().filter(function(x){return x.id!==s.id;})));loadSv();
+        };
+        d.appendChild(st);d.appendChild(nm);d.appendChild(pl);d.appendChild(act);d.appendChild(del);
+      }else{
+        act.textContent='Подключиться';act.disabled=s.online===false;
+        act.onclick=function(){svStatus('Подключаюсь…');joinServer(s.id);};
+        d.appendChild(st);d.appendChild(nm);d.appendChild(pl);d.appendChild(act);
+      }
+      list.appendChild(d);
+    });
+  }
+  function probeAll(tab){
+    svList.forEach(function(s){
+      probeServer(s.id,function(info){
+        if(svTab!==tab)return;
+        if(info){s.online=true;s.name=info.name||s.name;s.players=info.players;s.max=info.max;s.owner=info.owner||s.owner;if(info.official)s.official=true;}
+        else s.online=false;
+        renderSv();
+      });
+    });
+  }
+  function loadSv(){
+    var tab=svTab;
+    svStatus('');
+    if(tab==='off'){
+      svList=OFFICIAL.map(function(o){return {id:o.id,name:o.name,owner:'Скруп',official:true};});
+      renderSv();probeAll(tab);
+    }else if(tab==='fav'){
+      svList=favs().map(function(f){return {id:f.id,name:f.name};});
+      renderSv();probeAll(tab);
+    }else if(tab==='my'){
+      svList=myList().map(function(m){return {id:m.id,name:m.name,owner:me?me.disp:'',my:true,online:true,players:0,max:(loadSrvData(m.id)||{}).max};});
+      renderSv();
+    }else{
+      svList=[];renderSv();svStatus('Ищу серверы…');
+      dirList(function(list){
+        if(svTab!==tab)return;
+        if(list===null){svStatus('Не удалось получить список серверов (нужен интернет и PeerJS). Подключиться можно по ID через «Избранное».',true);return;}
+        svList=list.filter(function(s){return !s.official;}).map(function(s){return {id:s.id,name:s.name,owner:s.owner,players:s.players,max:s.max,online:true};});
+        svStatus(svList.length?'':'Серверов от игроков пока нет. Создай первый!');
+        renderSv();
+      });
+    }
+  }
+  function openSv(){show('srv');loadSv();}
+  function openNew(){
+    var w=document.getElementById('sn-off-wrap'),sel2=document.getElementById('sn-off-id'),creator=me&&me.nick.toLowerCase()==='sters',op;
+    document.getElementById('sn-err').textContent='';document.getElementById('sn-name').value='';
+    w.hidden=!creator;
+    if(creator&&!sel2.options.length)OFFICIAL.forEach(function(o,i){op=document.createElement('option');op.value=i;op.textContent=o.name;sel2.appendChild(op);});
+    document.getElementById('sv-new').hidden=false;
+    setTimeout(function(){document.getElementById('sn-name').focus();},0);
+  }
+  function createFull(){
+    var name=(document.getElementById('sn-name').value||'').trim(),max=+document.getElementById('sn-max').value,off=!document.getElementById('sn-off-wrap').hidden&&document.getElementById('sn-off').checked,err=document.getElementById('sn-err'),srv=null,id,oi,list;
+    if(off){oi=+document.getElementById('sn-off-id').value;id=OFFICIAL[oi].id;name=OFFICIAL[oi].name;srv=loadSrvData(id);}
+    else{
+      if(name.length<3){err.textContent='Название: минимум 3 символа';return;}
+      id='scrup-s-'+genCode();
+    }
+    if(!srv)srv={id:id,name:name,max:max,owner:me.nick,official:off,seed:(Math.random()*4294967296)>>>0,created:Date.now(),wlog:[],resp:[],savedAt:Date.now()};
+    lsSet(srvKey(srv.id),JSON.stringify(srv));
+    list=myList();
+    if(!list.some(function(x){return x.id===srv.id;})){list.push({id:srv.id,name:srv.name,created:srv.created});lsSet(MY_KEY,JSON.stringify(list));}
+    document.getElementById('sv-new').hidden=true;
+    startHost(srv);
+  }
+  document.getElementById('open-srv').onclick=openSv;
+  document.getElementById('sv-back').onclick=function(){show('menu');};
+  document.getElementById('sv-refresh').onclick=loadSv;
+  document.getElementById('sv-create').onclick=openNew;
+  document.getElementById('sn-cancel').onclick=function(){document.getElementById('sv-new').hidden=true;};
+  document.getElementById('sn-ok').onclick=createFull;
+  document.getElementById('sv-add').onclick=function(){
+    var id=document.getElementById('sv-id').value.trim(),a;
+    if(!id)return;
+    if(!isFav(id)){a=favs();a.push({id:id,name:id});lsSet(FAV_KEY,JSON.stringify(a));}
+    document.getElementById('sv-id').value='';loadSv();
+  };
+  document.querySelectorAll('.svtab').forEach(function(b){b.onclick=function(){svTab=b.dataset.tab;loadSv();};});
+  ['sn-name','sv-id'].forEach(function(i){document.getElementById(i).addEventListener('keydown',function(e){e.stopPropagation();if(e.key==='Enter'){if(i==='sn-name')createFull();else document.getElementById('sv-add').click();}});});
+  bootAuth();
   function pushOut(nx,nz,feet){
     var k,b,cx,cz,dx,dz,d,l,r,t,bt,m;
     for(k=0;k<colliders.length;k++){
@@ -2373,6 +2733,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     clock=new THREE.Clock();running=true;cancelAnimationFrame(raf);raf=requestAnimationFrame(frame);
   }
   function stopGame(){
+    saveSrv();saveInv();
     running=false;cancelAnimationFrame(raf);invOpen=false;invEl.hidden=true;giveEl.hidden=true;stopAudio();bmOpen=false;document.getElementById('bm').hidden=true;if(ghost)ghost.visible=false;if(furnEl)closeFurn();if(consEl&&!consEl.hidden)closeCons();craftEl.hidden=true;
     if(document.exitPointerLock&&document.pointerLockElement)document.exitPointerLock();
     show('menu');
