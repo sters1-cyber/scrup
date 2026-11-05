@@ -745,6 +745,165 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
   var DAYLEN=600,SUNV=new THREE.Vector3(-.5,.8,-.3).normalize(),SKYK={value:new THREE.Color(1,1,1)},hemiL=null,sunM=null,moonM=null,starP=null,skyT=0,dayH=10;
   var DC={dh:new THREE.Color(0xbcd6e4),dt:new THREE.Color(0x6f9ac0),sh:new THREE.Color(0xe58a52),st:new THREE.Color(0x4a5f8c),nh:new THREE.Color(0x0e1626),nt:new THREE.Color(0x03050c),hor:new THREE.Color(),top:new THREE.Color(),sd:new THREE.Vector3(),ld:new THREE.Vector3(),c1:new THREE.Color(),r:new THREE.Vector3(),u:new THREE.Vector3()};
+    /* ===== РЫБАЧКА: причал, мирная зона, NPC-водолаз в синем хазмате и квест на ящики ===== */
+  var PIER=null,PZ=null,PT=0,npcG=null,npcOpen=false,npcOpts=[],npcUI=null,npcHint=null,qHud=null,qZone=null,qCr=[],QZ=null,QS={st:0,got:[0,0,0,0,0]},pzIn=false,pierInit=false;
+  var QIT=[['Хазмат костюм','☣️',1],['Подводная маска','🥽',1],['Акваланг','🤿',1],['Ласты','🦶',1],['Скрап','♻️',10]];
+  var _pv=new THREE.Vector3(),_pf=new THREE.Vector3();
+  function pierIn(x,z){return !!PIER&&x>=PIER.x0&&x<=PIER.x1&&z>=PIER.z0&&z<=PIER.z1;}
+  function mb(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  function qSave(){try{lsSet('scrup-quest-'+worldSeed,JSON.stringify(QS));}catch(e){}}
+  function qLoad(){try{var d=JSON.parse(lsGet('scrup-quest-'+worldSeed)||'null');if(d&&d.got&&d.got.length===5)QS=d;}catch(e){}}
+  function qCnt(){return QS.got.reduce(function(a,b){return a+b;},0);}
+  function pCanvas(w,h,fn){var c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'));return new THREE.CanvasTexture(c);}
+  function pLabel(t,col){var m=new THREE.Sprite(new THREE.SpriteMaterial({map:pCanvas(256,64,function(x){x.font='bold 34px sans-serif';x.textAlign='center';x.textBaseline='middle';x.lineWidth=6;x.strokeStyle='#000';x.strokeText(t,128,34);x.fillStyle=col;x.fillText(t,128,34);}),transparent:true,fog:false}));m.scale.set(1.6,.4,1);return m;}
+  function makeNpc(){
+    var g=new THREE.Group(),L=function(c,e){return new THREE.MeshLambertMaterial({color:c,flatShading:true,emissive:e||0});},bl=L(0x2f7fd0),bd=L(0x1d4f8a),gl=L(0x12303c,0x0a2a3a),fl=L(0x2a2e33);
+    function b(w,h,l,mt,x,y,z){var o=new THREE.Mesh(new THREE.BoxGeometry(w,h,l),mt);o.position.set(x,y,z);g.add(o);return o;}
+    b(.22,.8,.24,bl,-.14,.45,0);b(.22,.8,.24,bl,.14,.45,0);b(.25,.14,.32,fl,-.14,.07,.04);b(.25,.14,.32,fl,.14,.07,.04);
+    b(.58,.7,.34,bl,0,1.2,0);b(.6,.1,.36,bd,0,.92,0);b(.14,.64,.16,bl,-.38,1.2,0);b(.14,.64,.16,bl,.38,1.2,0);
+    b(.16,.16,.18,bd,-.38,.82,0);b(.16,.16,.18,bd,.38,.82,0);b(.38,.38,.38,bl,0,1.78,0);b(.3,.2,.06,gl,0,1.8,.2);b(.3,.45,.14,bd,0,1.25,-.24);
+    var c=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,.12,8),fl);c.rotation.x=Math.PI/2;c.position.set(0,1.68,.22);g.add(c);
+    var lb=pLabel('Водолаз','#7fc0ff');lb.position.set(0,2.3,0);g.add(lb);return g;
+  }
+  function buildPier(){
+    var xs=[70,-70,140,-140,40,-40,220,-220,0,110,-110,180,-180,300,-300],k,x,z,j,ok,sz=null,px=0,T,i,g,m,len=40,wood,dark,pt;
+    ITEMS['Подводная маска']={i:'🥽',s:false};ITEMS['Акваланг']={i:'🤿',s:false};ITEMS['Ласты']={i:'🦶',s:false};
+    PIER=null;PZ=null;npcG=null;qZone=null;qCr=[];QZ=null;pzIn=false;QS={st:0,got:[0,0,0,0,0]};
+    for(k=0;k<xs.length&&sz===null;k++){
+      x=xs[k];if(Math.abs(x)>BX-60)continue;
+      for(z=160;z>-80;z--)if(hAt(x,z)<.1)break;
+      if(z<=-80||hAt(x,z+8)<=.3||riverD(x,z)<RW+8)continue;
+      ok=true;for(j=6;j<=40;j+=6)if(hAt(x,z-j)>-.3)ok=false;
+      if(ok){sz=z;px=x;}
+    }
+    if(sz===null)return;
+    T=Math.max(.7,hAt(px,sz+6)+.22);PT=T;PIER={x0:px-2,x1:px+2,z0:sz-32,z1:sz+8};PZ={x:px,z:sz-6,r:40};
+    found.push({x0:PIER.x0,z0:PIER.z0,w:4,d:len,top:T,roof:false,pier:1});
+    pt=pCanvas(128,256,function(c){c.fillStyle='#7a5a3a';c.fillRect(0,0,128,256);for(var n=0;n<8;n++){c.fillStyle=n%2?'#6b4d30':'#86643f';c.fillRect(n*16,0,15,256);c.fillStyle='#4a331f';c.fillRect(n*16+15,0,1,256);}});
+    pt.wrapS=pt.wrapT=THREE.RepeatWrapping;pt.repeat.set(1,10);
+    wood=new THREE.MeshLambertMaterial({map:pt});dark=new THREE.MeshLambertMaterial({color:0x4a3522,flatShading:true});g=new THREE.Group();
+    m=new THREE.Mesh(new THREE.BoxGeometry(4,.2,len),wood);m.position.set(px,T-.1,sz-12);g.add(m);
+    for(i=0;i<=6;i++)[-1.85,1.85].forEach(function(sx){var p=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,T+3.9,6),dark);p.position.set(px+sx,(T+.9-3)/2,sz+8-i*6.5);g.add(p);});
+    [-1.85,1.85].forEach(function(sx){[.9,.5].forEach(function(hy){var r=new THREE.Mesh(new THREE.BoxGeometry(.08,.08,len),dark);r.position.set(px+sx,T+hy,sz-12);g.add(r);});});
+    [-2,2].forEach(function(sx){var p=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,3.8,6),dark);p.position.set(px+sx,T+1.9,sz+8);g.add(p);});
+    m=new THREE.Mesh(new THREE.PlaneGeometry(4,1),new THREE.MeshBasicMaterial({map:pCanvas(512,128,function(c){c.fillStyle='#1c2a36';c.fillRect(0,0,512,128);c.strokeStyle='#7fc0ff';c.lineWidth=6;c.strokeRect(4,4,504,120);c.fillStyle='#e8eef5';c.font='bold 62px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('РЫБАЧКА',256,48);c.fillStyle='#7fe08a';c.font='bold 30px sans-serif';c.fillText('МИРНАЯ ЗОНА',256,98);}),side:THREE.DoubleSide,fog:false}));
+    m.position.set(px,T+3.2,sz+8);g.add(m);
+    m=new THREE.Mesh(new THREE.BoxGeometry(.3,.3,.3),new THREE.MeshBasicMaterial({color:0xffd27a}));m.position.set(px+1.8,T+2.4,sz+3);g.add(m);
+    j=new THREE.PointLight(0xffc070,1.1,26,2);j.position.set(px+1.6,T+2.4,sz+3);g.add(j);
+    [[px-1.2,sz-2,.9,.9,.9],[px-1.2,sz-3.1,.8,.8,.8]].forEach(function(c){var q=new THREE.Mesh(new THREE.BoxGeometry(c[2],c[3],c[4]),new THREE.MeshLambertMaterial({color:0x6b4d30,flatShading:true}));q.position.set(c[0],T+c[3]/2,c[1]);g.add(q);});
+    scene.add(g);
+    npcG=makeNpc();npcG.position.set(px+.9,T,sz+4);scene.add(npcG);
+    if(!pierInit)initNpcUI();
+    qLoad();if(QS.st===1)qBuild();
+  }
+  function qBuild(){
+    var rnd=mb(worldSeed^0x71f3a9),k,ang,dd,cx,cz,h,i,a,r,x,z,t,zm,w,bc,bm;
+    if(qZone)scene.remove(qZone);qCr.forEach(function(c){scene.remove(c.g);});qCr=[];
+    for(k=0;k<80;k++){ang=Math.PI*(.2+.6*rnd());dd=480+rnd()*40;cx=PZ.x+Math.cos(ang)*dd;cz=PZ.z+Math.sin(ang)*dd;h=hAt(cx,cz);if(Math.abs(cx)<BX-130&&cz<BZ-130&&h>2&&h<45&&depthAt(cx,cz)===0)break;}
+    QZ={x:cx,z:cz,r:90};
+    for(i=0;i<5;i++){
+      for(t=0;t<60;t++){a=rnd()*6.283;r=(.15+.7*rnd())*QZ.r;x=QZ.x+Math.cos(a)*r;z=QZ.z+Math.sin(a)*r;h=hAt(x,z);if(h>1.5&&h<60&&depthAt(x,z)===0&&Math.abs(hAt(x+1.5,z)-h)<.8)break;}
+      qCr[i]=mkQCrate(x,z,h,!!QS.got[i]);
+    }
+    zm=new THREE.MeshBasicMaterial({color:0xffd23f,transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false,fog:false});
+    bm=new THREE.MeshBasicMaterial({color:0xffe27a,transparent:true,opacity:.3,depthWrite:false,fog:false});
+    qZone=new THREE.Group();h=hAt(QZ.x,QZ.z);
+    w=new THREE.Mesh(new THREE.CylinderGeometry(QZ.r,QZ.r,160,64,1,true),zm);w.position.y=h+60;
+    bc=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,500,8),bm);bc.position.y=h+200;
+    qZone.add(w,bc);qZone.position.set(QZ.x,0,QZ.z);qZone.userData.m=zm;scene.add(qZone);
+  }
+  function mkQCrate(x,z,h,open){
+    var g=new THREE.Group(),b=new THREE.Mesh(new THREE.BoxGeometry(1.1,.7,.8),new THREE.MeshLambertMaterial({color:0x3e5a3c,flatShading:true})),lid=new THREE.Group(),l=new THREE.Mesh(new THREE.BoxGeometry(1.14,.14,.84),new THREE.MeshLambertMaterial({color:0xd8b030,emissive:0x302400,flatShading:true}));
+    b.position.y=.35;l.position.set(0,0,.42);lid.position.set(0,.7,-.42);lid.add(l);g.add(b,lid);
+    g.position.set(x,h,z);g.rotation.y=(x*7.3+z*3.1)%6.28;if(open)lid.rotation.x=-1.2;scene.add(g);
+    return {g:g,lid:lid,x:x,y:h,z:z};
+  }
+  function pLook(x,y,z,maxD,minDot){
+    cam.getWorldDirection(_pf);_pv.set(x-cam.position.x,y-cam.position.y,z-cam.position.z);
+    var d=_pv.length();if(d>maxD||d<.01)return false;_pv.divideScalar(d);return _pf.dot(_pv)>minDot;
+  }
+  function npcLook(){
+    var i,c;
+    if(!PIER||!running||plDead||!npcG)return 0;
+    if(pLook(npcG.position.x,npcG.position.y+1.2,npcG.position.z,3.6,.9))return 1;
+    if(QS.st===1)for(i=0;i<5;i++){c=qCr[i];if(c&&!QS.got[i]&&pLook(c.x,c.y+.4,c.z,3.4,.92))return 10+i;}
+    return 0;
+  }
+  function openQCrate(i){
+    var q=QIT[i],it={n:q[0],i:q[1],c:q[2],q:1},a=hot.indexOf(null),b=inv.indexOf(null);
+    if(a<0&&b<0){say('Нет места в инвентаре');return;}
+    if(b>=0)inv[b]=it;else hot[a]=it;
+    QS.got[i]=1;qCr[i].lid.rotation.x=-1.2;qSave();renderSlots();saveInv();sfx(240,.2);
+    say('Ящик открыт: '+q[1]+' '+q[0]+(q[2]>1?' ×'+q[2]:'')+' ('+qCnt()+'/5)');
+  }
+  function npcE(){
+    var t;
+    if(!running||plDead)return false;
+    if(npcOpen){closeNpc();return true;}
+    if(invOpen)return false;
+    t=npcLook();
+    if(t===1){openNpc();return true;}
+    if(t>=10){openQCrate(t-10);return true;}
+    return false;
+  }
+  function npcSay(txt,opts){
+    var h=document.createElement('h3'),p=document.createElement('p');
+    npcUI.textContent='';h.textContent='☣️ Водолаз';p.textContent=txt;npcUI.appendChild(h);npcUI.appendChild(p);npcOpts=opts;
+    opts.forEach(function(o,i){var b=document.createElement('button');b.textContent=(i+1)+'. '+o[0];b.onclick=o[1];npcUI.appendChild(b);});
+  }
+  function openNpc(){npcOpen=true;invOpen=true;npcUI.hidden=false;if(document.pointerLockElement)document.exitPointerLock();npcMain();}
+  function closeNpc(){npcOpen=false;invOpen=false;npcUI.hidden=true;}
+  function npcMain(){
+    if(QS.st===0)npcSay('Здорово, выживший. На Рыбачке тихо — но снаряга сама себя не найдёт. Есть работа, если не боишься.',[['Взять задание',npcAccept],['Уйти',closeNpc]]);
+    else if(QS.st===1){
+      if(qCnt()===5)npcSay('Все пять ящиков вскрыты! Покажи, что нашёл.',[['Сдать задание',npcFinish],['Уйти',closeNpc]]);
+      else npcSay('Жёлтая зона на карте мира — там ящики. Вскрыто: '+qCnt()+'/5. Найденное выбросить или убрать в ящик не выйдет, пока не закончишь.',[['Напомнить, что искать',npcBrief],['Уйти',closeNpc]]);
+    }else npcSay('Ты уже справился. Рыбачка всегда рада гостям.',[['Уйти',closeNpc]]);
+  }
+  function npcBrief(){
+    npcSay('Метрах в 500 от Рыбачки, в подсвеченной жёлтым зоне, стоят 5 ящиков. Открывай по одному (E):\n1-й — хазмат костюм\n2-й — подводная маска\n3-й — акваланг\n4-й — ласты\n5-й — 10 скрапа\nВсё найденное остаётся при тебе: выбросить и спрятать в ящик нельзя. Вскроешь все — возвращайся ко мне.',[['Ясно, иду',closeNpc]]);
+  }
+  function npcAccept(){QS={st:1,got:[0,0,0,0,0]};qSave();qBuild();npcBrief();}
+  function npcFinish(){
+    var i,miss=-1,has=function(n){return hot.concat(inv).some(function(it){return it&&it.q&&it.n===n;});};
+    for(i=0;i<5;i++)if(!has(QIT[i][0])){miss=i;break;}
+    if(miss>=0){QS.got[miss]=0;qSave();qBuild();npcSay('Не вижу при тебе: '+QIT[miss][0]+'. Ящик снова ждёт в жёлтой зоне.',[['Понял',closeNpc]]);return;}
+    hot.concat(inv).forEach(function(it){if(it&&it.q)delete it.q;});
+    QS.st=2;qSave();saveInv();renderSlots();
+    npcSay('Отличная работа! Снаряга теперь полностью твоя — можно выбрасывать и прятать.',[['Уйти',closeNpc]]);
+  }
+  function initNpcUI(){
+    var st=document.createElement('style'),g=document.getElementById('game');pierInit=true;
+    st.textContent='#npcw{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);width:min(560px,94vw);z-index:40;background:rgba(18,26,34,.94);border:2px solid #3a82d0;border-radius:14px;padding:14px 16px;color:#e8eef5;font:500 1rem Rubik,system-ui,sans-serif}#npcw h3{margin:0 0 6px;font:800 1rem Unbounded,sans-serif;color:#7fc0ff}#npcw p{margin:0 0 12px;line-height:1.45;white-space:pre-line}#npcw button{display:block;width:100%;margin-top:8px;padding:12px;border-radius:10px;border:1px solid #3a82d0;background:#173048;color:#e8eef5;font:600 1rem Rubik,sans-serif;cursor:pointer;text-align:left}#npcw button:hover{background:#21456b}#npchint,#qhud{position:absolute;left:50%;transform:translateX(-50%);z-index:21;pointer-events:none;text-align:center;color:#fff;text-shadow:0 1px 4px #000;font:600 1rem Rubik,sans-serif;display:none}#npchint{top:calc(50% + 40px)}#qhud{top:calc(env(safe-area-inset-top,0px) + 44px);background:rgba(20,22,20,.62);padding:4px 12px;border-radius:8px;font-size:.9rem}';
+    document.head.appendChild(st);
+    npcUI=document.createElement('div');npcUI.id='npcw';npcUI.hidden=true;g.appendChild(npcUI);
+    npcHint=document.createElement('div');npcHint.id='npchint';g.appendChild(npcHint);
+    qHud=document.createElement('div');qHud.id='qhud';g.appendChild(qHud);
+    window.addEventListener('keydown',function(e){
+      if(!npcOpen)return;
+      if(e.key==='Escape'){closeNpc();e.stopImmediatePropagation();return;}
+      if(/^[1-3]$/.test(e.key)&&npcOpts[+e.key-1]){npcOpts[+e.key-1][1]();e.stopImmediatePropagation();e.preventDefault();}
+    },true);
+  }
+  function updatePier(dt,t){
+    var dx,dz,tg,da,d,l,hint='';
+    if(!PIER||!npcG)return;
+    dx=P.x-npcG.position.x;dz=P.z-npcG.position.z;
+    if(Math.hypot(dx,dz)<12){tg=Math.atan2(dx,dz);da=Math.atan2(Math.sin(tg-npcG.rotation.y),Math.cos(tg-npcG.rotation.y));npcG.rotation.y+=da*Math.min(1,dt*4);}
+    npcG.scale.y=1+Math.sin(t*1.8)*.008;
+    d=Math.hypot(P.x-PZ.x,P.z-PZ.z)<PZ.r;
+    if(d)plSafe=Math.max(plSafe,.3);
+    if(d!==pzIn){pzIn=d;say(d?'Мирная зона: Рыбачка — урон отключён':'Вы покинули мирную зону');}
+    l=npcOpen||invOpen?0:npcLook();hint=l===1?'E — поговорить':(l>=10?'E — открыть ящик':'');
+    npcHint.textContent=hint;npcHint.style.display=hint?'block':'none';
+    if(QZ){
+      qCr.forEach(function(c){c.g.visible=QS.st===1;});qZone.visible=QS.st===1;
+      if(QS.st===1){
+        d=Math.hypot(P.x-QZ.x,P.z-QZ.z);qZone.userData.m.opacity=.14+.07*Math.sin(t*2);
+        qHud.textContent='Задание: ящики '+qCnt()+'/5 · '+(d<=QZ.r?'вы в зоне':'до зоны ≈ '+Math.round(d-QZ.r)+' м');qHud.style.display='block';
+      }else qHud.style.display='none';
+    }
+  }
   function sstep(a,b,v){v=clamp((v-a)/(b-a),0,1);return v*v*(3-2*v);}
   function buildStars(){
     var n=700,pos=new Float32Array(n*3),i,u,v,r,g=new THREE.BufferGeometry();
@@ -944,6 +1103,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     return h;
   }
   function depthAt(x,z){
+    if(pierIn(x,z))return 0;
     var h=hAt(x,z),s=h<0?-h:0,v;
     if(z>-240&&riverD(x,z)<RW){v=waterY(z)-h;if(v>s)s=v;}
     return s;
@@ -1698,10 +1858,11 @@ input[type=range]{width:150px;accent-color:var(--accent)}
       birds.push({g:G,wl:wl,wr:wr,a:Math.random()*6.28,r:25+Math.random()*50,cx:rcp[0],cz:rcp[1],y:12+Math.random()*12,sp:.25+Math.random()*.2,ph:Math.random()*6});
     }
     [['deer',18],['boar',10],['hen',16]].forEach(function(s){for(var k=0;k<s[1];k++)spawnOne(s[0]);});
+    try{buildPier();}catch(e){console.error('pier',e);}
   }
   function updateWorld(dt,t){
     var i,j,an,bq,c,dx,dz,dp,spd,da,ax,az,nb;
-    sky.position.copy(cam.position);updateDay(dt);updateTerrain();updateCull(dt);updateField();updateMap(dt);
+    sky.position.copy(cam.position);updateDay(dt);try{updatePier(dt,t);}catch(e){if(!window._pe){window._pe=1;console.error(e);}}updateTerrain();updateCull(dt);updateField();updateMap(dt);
     for(i=0;i<clouds.length;i++){c=clouds[i];c.position.x+=dt*1.6;if(c.position.x-P.x>1500)c.position.x-=3000;else if(c.position.x-P.x<-1500)c.position.x+=3000;if(c.position.z-P.z>1500)c.position.z-=3000;else if(c.position.z-P.z<-1500)c.position.z+=3000;}
     for(i=0;i<birds.length;i++){
       bq=birds[i];bq.a+=bq.sp*dt;
@@ -2546,7 +2707,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
     x=A[i1];y=B[i2];if(!x)return;
     if(a2==='fo')return;
     if(a2==='fi'&&!okIn(x.n))return;
-    mg=!!(y&&x.n===y.n&&ITEMS[x.n]&&ITEMS[x.n].s);
+    mg=!!(y&&x.n===y.n&&ITEMS[x.n]&&ITEMS[x.n].s);if(x.q||(y&&y.q))mg=false;
     if(a1==='fo'&&y&&!mg)return;
     if(a1==='fi'&&y&&!mg&&!okIn(y.n))return;
     if(mg){y.c+=x.c;A[i1]=null;}else{A[i1]=y;B[i2]=x;}
@@ -5698,7 +5859,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   /* ---------- двери и код-замки ---------- */
   var doors=[],doorGh=null,doorTgt=null,doorOK=false,codeEl=document.getElementById('codewin'),codeCur=null,codeMode='',codeBuf='',doorAuth={},useE=false;
   var DOOR_H=2.05;
-  function tryUseE(){useE=true;var r=tryUse();useE=false;return r;}
+  function tryUseE(){if(npcE())return true;useE=true;var r=tryUse();useE=false;return r;}
   /* то же, что клавиша E: закрыть окно / открыть дверь, лестницу, ящик / собрать куст / подобрать вещь. Нужна на телефоне, где клавиши E нет */
   function useAction(){
     if(!running||plDead)return;
@@ -5987,6 +6148,7 @@ input[type=range]{width:150px;accent-color:var(--accent)}
   function boxByFid(f){var i;for(i=0;i<boxes.length;i++)if(boxes[i].fid===f)return boxes[i];return null;}
   function boxNorm(b,items){var out=new Array(b.big?48:18).fill(null),i;(items||[]).forEach(function(it,k){if(it&&k<out.length)out[k]={n:it.n,i:it.i,c:it.c};});return out;}
   function boxPut(b,it){
+    if(it&&it.q){say('Квестовый предмет нельзя убрать в ящик');return false;}
     var st=!!(ITEMS[it.n]&&ITEMS[it.n].s),k;
     if(st){k=fslot(b.items,it.n);if(k>=0){b.items[k].c+=it.c;return true;}}
     k=b.items.indexOf(null);if(k<0)return false;
